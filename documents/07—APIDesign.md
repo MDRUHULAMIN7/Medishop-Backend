@@ -202,6 +202,22 @@ POST   /courier/shipments/:trackingNumber/cancel
 POST   /courier/pickups
 ```
 
+### Stores / Inventory / POS
+```
+GET    /stores                         (admin — list stores / branches)
+POST   /stores                         (admin — create store)
+PATCH  /stores/:id                     (admin — update store)
+GET    /inventory                      (admin, inventory_manager — shared stock overview)
+GET    /inventory/:productId           (admin, inventory_manager — per-product stock lookup)
+PATCH  /inventory/:productId/adjust    (admin, inventory_manager — stock correction)
+GET    /inventory/ledger               (admin, inventory_manager — stock movement audit trail)
+POST   /pos/sales                      (admin, sales_staff — create offline sale invoice)
+GET    /pos/sales                      (admin, sales_staff — list POS sales)
+GET    /pos/sales/:id                  (admin, sales_staff — sale details / receipt)
+POST   /pos/sales/:id/refund           (admin, sales_staff — refund or void sale)
+GET    /pos/sales/:id/invoice          (download printable POS invoice)
+```
+
 ## 7. Example — Endpoint Contract
 
 **`POST /api/v1/orders/checkout`**

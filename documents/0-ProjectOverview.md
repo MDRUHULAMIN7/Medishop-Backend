@@ -4,6 +4,11 @@
 
 **mediShop** is an online pharmacy and digital healthcare platform for the Bangladesh market, inspired by MedEasy.health. It allows customers to search, order, and receive medicines and healthcare products at home, with support for prescription-based ordering, pharmacist verification, and doorstep delivery.
 
+The platform is also designed to support a **shared online + offline store workflow**. That means the same backend can power:
+- the public website for online customers,
+- an internal POS dashboard for offline counter sales,
+- and a single shared inventory so stock never diverges between channels.
+
 This document set defines the **backend blueprint** for mediShop. Phase 1 of the project delivered a frontend-only demo (Next.js, mocked data). This documentation defines the **production-grade backend** that the frontend will eventually connect to.
 
 The backend is built as a **feature-based modular monolith** — a single deployable service, internally organized into independent, self-contained feature modules (auth, product, order, etc.), each following the same internal structure.
@@ -33,9 +38,11 @@ The backend is built as a **feature-based modular monolith** — a single deploy
 - Checkout and order placement with stock verification.
 - Order tracking with real-time status updates via Socket.IO.
 - Order history and invoice download.
+- Shared inventory management for online and offline sales.
+- POS billing dashboard for in-store counter sales with invoice/receipt printing.
 - Product reviews and verified ratings.
 - Notifications (order updates, prescription approval, promo offers).
-- Admin dashboard: manage banners, site branding, products, categories, brands, orders, coupons, prescriptions, users.
+- Admin dashboard: manage banners, site branding, products, categories, brands, orders, coupons, prescriptions, users, inventory, and POS sales.
 
 ## 4. Non-Functional Requirements
 

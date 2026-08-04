@@ -13,7 +13,7 @@
 | Input validation | Every request body/params/query validated with Zod before reaching a controller |
 | NoSQL injection | Zod validation rejects non-primitive/unexpected shapes before they reach Mongoose queries; no raw user input is ever interpolated into a query object |
 | XSS | API returns JSON only (no HTML rendering); `helmet` sets sensible defaults; input is stored as-is but the frontend is responsible for escaping on render |
-| RBAC | `authorize(roles[])` middleware on every privileged route |
+| RBAC | `authorize(roles[])` middleware on every privileged route (`customer`, `pharmacist`, `sales_staff`, `inventory_manager`, `admin`) |
 | Secrets management | All secrets in environment variables, never in source control |
 | File upload safety | Multer file-type/size limits before Cloudinary upload; only image MIME types accepted for product/prescription images |
 

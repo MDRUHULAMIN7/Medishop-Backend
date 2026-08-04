@@ -49,7 +49,7 @@ Database state is seeded before each test file (`beforeAll`) and cleaned between
 - **Cart:** add/update/remove, stock/price re-validation.
 - **Checkout:** success path, insufficient stock, missing prescription, invalid coupon, idempotency key reuse.
 - **Order:** status transitions (valid sequence enforced, invalid jumps rejected), customer can only see their own orders, admin can see all.
-- **RBAC:** every admin-only route rejects a `customer`-role token with `403`.
+- **RBAC:** every restricted route rejects an unauthorized role token with `403` (`customer` on admin routes, `sales_staff` on inventory-only/POS routes, etc.).
 
 ## 6. Coverage Target
 

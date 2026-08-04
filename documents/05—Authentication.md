@@ -185,11 +185,13 @@ Requires current password confirmation before allowing the change. On success, a
 
 | Role | Description |
 |---|---|
-| `customer` | Default role for registered users |
-| `pharmacist` | Can review/approve prescription uploads |
-| `admin` | Full management access (products, orders, coupons, users) |
+| `customer` | Default role for registered users; can browse, order, and track purchases |
+| `pharmacist` | Can review/approve prescription uploads and prescription-gated orders |
+| `sales_staff` | Can create POS sales, print invoices, and manage counter billing |
+| `inventory_manager` | Can manage store inventory, stock adjustments, and stock ledger entries |
+| `admin` | Full management access (products, orders, coupons, users, stores, POS, inventory) |
 
-Role is stored on the user document and embedded in the access token payload. `authorize(["admin"])` middleware guards admin-only routes.
+Role is stored on the user document and embedded in the access token payload. `customer` is the only public-registration role. `authorize([...])` middleware guards role-restricted routes, typically `admin` for core management and `sales_staff` / `inventory_manager` for POS and stock operations.
 
 ## 13. Security Rules Summary
 

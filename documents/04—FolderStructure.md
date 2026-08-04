@@ -54,6 +54,9 @@ modules/
 ├── order/
 ├── notification/
 ├── courier/
+├── store/
+├── inventory/
+├── pos/
 ├── banner/
 ├── site-setting/
 └── admin/

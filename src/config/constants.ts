@@ -14,6 +14,8 @@ export const HTTP_STATUS = {
 export const ROLES = {
   CUSTOMER: 'customer',
   PHARMACIST: 'pharmacist',
+  SALES_STAFF: 'sales_staff',
+  INVENTORY_MANAGER: 'inventory_manager',
   ADMIN: 'admin',
 } as const;
 

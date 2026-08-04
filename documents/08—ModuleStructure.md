@@ -33,6 +33,9 @@ A module that doesn't own a collection (rare — most do) simply omits `<name>.m
 | `order` | `orders` | `cart`, `coupon`, `product`, `prescription`, `notification` |
 | `notification` | `notifications` | `socket` |
 | `courier` | — | `order` |
+| `store` | `stores` | `inventory`, `pos` |
+| `inventory` | `inventory_items`, `stock_ledger` | `product`, `order`, `pos` |
+| `pos` | `pos_sales` | `inventory`, `user`, `product` |
 | `admin` | — (orchestrates other modules' services) | all of the above |
 
 ## 3. Example — `product` Module Contract

@@ -4,7 +4,7 @@
 
 | Collection | Purpose |
 |---|---|
-| `users` | Customers, pharmacists, admins |
+| `users` | Customers, pharmacists, sales staff, inventory managers, admins |
 | `categories` | Medicine/product categories (hierarchical) |
 | `brands` | Manufacturer/brand records |
 | `products` | Medicines & healthcare products |
@@ -16,6 +16,10 @@
 | `notifications` | User notification feed |
 | `banners` | Hero slider promotional banners |
 | `site_settings` | Dynamic branding, theme colors & contact info |
+| `stores` | Physical store / branch records for POS and inventory sync |
+| `inventory_items` | Shared stock per product per store |
+| `stock_ledger` | Stock movement audit trail for online and offline sales |
+| `pos_sales` | Offline POS billing records and receipts |
 
 ## 2. `users`
 
@@ -25,7 +29,7 @@
 | email | String | unique, sparse |
 | phone | String | unique, sparse |
 | password | String | bcrypt hash, `select: false` |
-| role | Enum | `customer` \| `pharmacist` \| `admin`, default `customer` |
+| role | Enum | `customer` \| `pharmacist` \| `sales_staff` \| `inventory_manager` \| `admin`, default `customer` |
 | isVerified | Boolean | default false |
 | addresses | Address[] | embedded subdocuments |
 | createdAt / updatedAt | Date | timestamps |
@@ -174,7 +178,59 @@
 | address | String | physical pharmacy address |
 | socialLinks | Object | `{ facebook, instagram, whatsapp }` |
 
-## 14. Relationships Summary
+## 14. `stores` (Physical Branches / POS Locations)
+
+| Field | Type | Notes |
+|---|---|---|
+| name | String | branch or outlet name |
+| code | String | unique store code |
+| phone | String | contact number |
+| address | String | store address |
+| isActive | Boolean | default true |
+
+## 15. `inventory_items` (Shared Stock)
+
+| Field | Type | Notes |
+|---|---|---|
+| store | ObjectId â†’ stores | branch/location owning the stock |
+| product | ObjectId â†’ products | indexed |
+| availableStock | Number | current salable quantity |
+| reservedStock | Number | temporary holds for checkout / POS |
+| lowStockThreshold | Number | alert threshold |
+| updatedBy | ObjectId â†’ users | admin/staff who adjusted stock |
+
+**Constraint:** unique compound index on `store + product`.
+
+## 16. `stock_ledger` (Inventory Audit Trail)
+
+| Field | Type | Notes |
+|---|---|---|
+| store | ObjectId â†’ stores | branch/location |
+| product | ObjectId â†’ products | indexed |
+| changeType | Enum | `online_sale` \| `pos_sale` \| `return` \| `adjustment` \| `purchase` \| `reserve` \| `release` |
+| quantity | Number | positive or negative movement |
+| referenceType | String | `order`, `pos_sale`, `purchase`, `manual` |
+| referenceId | ObjectId/String | linked transaction id |
+| note | String | optional reason |
+| createdBy | ObjectId â†’ users | actor who triggered change |
+| createdAt | Date | audit timestamp |
+
+## 17. `pos_sales` (Offline Billing)
+
+| Field | Type | Notes |
+|---|---|---|
+| store | ObjectId â†’ stores | branch where sale happened |
+| salesStaff | ObjectId â†’ users | sales staff/admin who created the bill |
+| customerName | String | optional walk-in customer name |
+| customerPhone | String | optional phone number |
+| items | PosSaleItem[] | snapshot of product, price, quantity |
+| subtotal / discount / total | Number | bill totals |
+| paymentMethod | Enum | `cash` \| `card` \| `mobile_banking` \| `mixed` |
+| invoiceNumber | String | unique printable invoice id |
+| status | Enum | `completed` \| `voided` \| `refunded` |
+| createdAt / updatedAt | Date | timestamps |
+
+## 18. Relationships Summary
 
 ```
 users ──< orders ──< orderItems (snapshot of products)
@@ -189,7 +245,9 @@ banners (standalone collection)
 site_settings (singleton configuration record)
 ```
 
-## 15. Validation Rules (enforced at schema + Zod layer)
+Shared inventory note: `stores`, `inventory_items`, `stock_ledger`, and `pos_sales` together keep online orders and offline POS sales synchronized against the same product stock.
+
+## 19. Validation Rules (enforced at schema + Zod layer)
 
 - Prices, stock, and quantities are never negative.
 - `orders.items` is immutable once an order moves past `pending` — corrections happen via new orders/refunds, not edits.
