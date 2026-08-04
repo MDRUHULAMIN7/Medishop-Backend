@@ -2,6 +2,7 @@ import app from './app';
 import { config } from './config/env';
 import { connectDatabase } from './database/connection';
 import { redisClient } from './redis/client';
+import { initSocket } from './socket';
 
 const startServer = async () => {
   try {
@@ -25,6 +26,10 @@ const startServer = async () => {
       console.log(`📚 Swagger UI  : http://localhost:${config.PORT}/api/v1/docs`);
       console.log(`====================================================`);
     });
+
+    // 4. Initialize Real-Time Socket.io Server
+    initSocket(server);
+    console.log(`🔌 Socket.io Real-time Event Server Initialized`);
 
     // Unhandled Rejection & Uncaught Exception Handlers
     process.on('unhandledRejection', (reason: Error) => {
