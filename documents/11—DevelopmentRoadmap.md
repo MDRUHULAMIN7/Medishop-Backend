@@ -5,18 +5,19 @@ This is the execution plan. Each phase is built and tested before moving to the 
 ## Phase 0 — Project Setup
 **Goal:** A running, empty, correctly configured server.
 - Follow `01-setup.md` fully.
-- Implement `config/env.ts` (Zod-validated env), `database/connection.ts`, `server.ts` with a `/health` endpoint.
+- Implement `config/env.ts` (Zod-validated env), `config/swagger.ts` (Swagger UI / OpenAPI spec setup), `database/connection.ts`, `server.ts` with a `/health` and `/api/v1/docs` endpoint.
 - Set up `errorHandler` and `requestLogger` middleware (even before any real routes exist).
-- **Exit criteria:** `npm run dev` starts the server, `/health` returns `200`, connecting to MongoDB Atlas and Redis Cloud both succeed and are logged.
+- **Exit criteria:** `npm run dev` starts the server, `/health` returns `200`, `/api/v1/docs` renders Swagger UI, connecting to MongoDB Atlas and Redis Cloud both succeed and are logged.
 
 ## Phase 1 — Authentication
-**Goal:** Full auth flow working end-to-end.
+**Goal:** Full auth flow working end-to-end with Swagger annotations.
 - Build `user` module (model only, minimal service) and `auth` module per `05-authentication.md`.
+- Add `@openapi` Swagger JSDoc annotations to all `/auth/*` routes.
 - Implement `authenticate` and `authorize` middleware.
 - **APIs:** all `/auth/*` endpoints from `07-api-design.md`.
 - **Database:** `users` collection with indexes.
 - **Redis:** OTP keys, refresh token store.
-- **Exit criteria:** register → verify → login → access protected test route → refresh → logout all work via Postman/Thunder Client, covered by integration tests.
+- **Exit criteria:** check-identifier → OTP verify/password login → complete registration → access protected test route → refresh → logout all work via Postman/Thunder Client/Swagger UI, covered by integration tests.
 
 ## Phase 2 — User Profile
 **Goal:** Authenticated users can manage their profile and addresses.

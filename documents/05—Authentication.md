@@ -2,81 +2,110 @@
 
 Authentication is the most detailed module in this documentation because it is the foundation every other protected feature depends on. Once implemented, this flow does not change (see `design.md`).
 
-## 1. Complete Authentication Flow
+## 1. Complete Unified Authentication Flow
+
+The frontend presents a **Single Input Field** accepting either an **Email address** or a **Bangladesh Phone Number** (`01XXXXXXXXX` or `+8801XXXXXXXXX`).
 
 ```
-Register (name, email/phone, password)
+User submits Identifier (Email or BD Phone)
     ↓
-Send OTP to email/phone
+POST /api/v1/auth/check-identifier
     ↓
-Store OTP in Redis (hashed, with TTL)
+Server validates format (Zod: Email OR BD phone regex ^(\+88)?01[3-9]\d{8}$)
     ↓
-User submits OTP
-    ↓
-Verify OTP against Redis
-    ↓
-Hash password with bcrypt
-    ↓
-Create user account (status: verified)
-    ↓
-Login (email/phone + password)
-    ↓
-Verify password hash
-    ↓
-Issue Access Token (short-lived) + Refresh Token (long-lived)
-    ↓
-Set Refresh Token as HTTP-only cookie
-    ↓
-Return Access Token in response body
-    ↓
-Client sends Access Token on every protected request (Authorization header)
-    ↓
-Access Token expires
-    ↓
-Client calls /auth/refresh (cookie sent automatically)
-    ↓
-Server verifies Refresh Token, rotates it, issues a new Access Token
-    ↓
-Logout → Refresh Token revoked (removed from Redis) + cookie cleared
+Checks MongoDB for existing user
+    ├── USER EXISTS
+    │   ↓
+    │   Returns { exists: true, action: "LOGIN_PASSWORD" }
+    │   ↓
+    │   User enters Password
+    │   ↓
+    │   POST /api/v1/auth/login ({ identifier, password })
+    │   ↓
+    │   Verify password hash → Issue Access Token + Refresh Cookie
+    │
+    └── USER DOES NOT EXIST
+        ↓
+        Returns { exists: false, action: "VERIFY_OTP" }
+        ↓
+        Server generates 6-digit OTP & stores in Redis (ttl: 5 min)
+        ↓
+        Sends OTP via Email (Nodemailer) or SMS (SMS Gateway / Mock logger)
+        ↓
+        User submits OTP → POST /api/v1/auth/verify-otp ({ identifier, otp })
+        ↓
+        On OTP success → Returns short-lived verificationToken (10 min TTL in Redis)
+        ↓
+        User sets Name & Password → POST /api/v1/auth/complete-registration ({ verificationToken, name, password })
+        ↓
+        Create user in MongoDB → Issue Access Token + Refresh Cookie
 ```
 
-## 2. Registration
+## 2. Check Identifier
 
-**Endpoint:** `POST /api/v1/auth/register`
+**Endpoint:** `POST /api/v1/auth/check-identifier`
 
-1. Validate input with Zod: name, email or phone, password (min length, complexity rule).
-2. Check the user does not already exist and is not already pending verification.
-3. Create a `pending` user record (or a Redis-only pending record) — the account is not fully active until OTP verification.
-4. Generate a 6-digit OTP.
-5. Store `otp:register:<email>` in Redis with a TTL (`OTP_EXPIRES_MINUTES`), value = bcrypt-hashed OTP.
-6. Send the OTP via email/SMS.
-7. Respond with success — do not leak whether the account previously existed (avoid user enumeration).
+1. Validate format using Zod:
+   - Email format OR Bangladesh phone regex: `^(\+88)?01[3-9]\d{8}$`.
+   - Phone numbers are normalized internally to standard format (e.g. `+8801712345678`).
+2. Query `users` collection in MongoDB by `email` or `phone`.
+3. If user exists:
+   - Returns `{ exists: true, action: "LOGIN_PASSWORD" }`.
+4. If user does NOT exist:
+   - Generate a 6-digit cryptographically random OTP.
+   - Store hashed OTP in Redis: `otp:register:<normalized_identifier>` with TTL = 300 seconds (5 mins).
+   - Send OTP via the Notification Service (see §4).
+   - Returns `{ exists: false, action: "VERIFY_OTP", targetType: "email" | "phone" }`.
 
-## 3. OTP Verification
+## 3. Registration via OTP & Password Setup
 
+### Step 3.1: Verify OTP
 **Endpoint:** `POST /api/v1/auth/verify-otp`
+1. Request: `{ identifier, otp }`.
+2. Look up `otp:register:<identifier>` in Redis.
+3. On max 3 wrong attempts, delete the key and require requesting a new OTP.
+4. On success:
+   - Delete the OTP Redis key.
+   - Generate a cryptographically secure `verificationToken` (UUID/random hex).
+   - Save `registration_session:<verificationToken>` = `<normalized_identifier>` in Redis with a 10-minute TTL.
+   - Return `{ verificationToken }` to the client.
 
-1. Look up `otp:register:<email>` in Redis.
-2. If missing → `OTP_EXPIRED` error.
-3. Compare submitted OTP against the stored hash.
-4. On 3 consecutive wrong attempts, invalidate the OTP and require a new one (tracked via a Redis counter with the same TTL).
-5. On success: mark the user `verified: true`, delete the Redis key.
+### Step 3.2: Complete Registration
+**Endpoint:** `POST /api/v1/auth/complete-registration`
+1. Request: `{ verificationToken, name, password }`.
+2. Retrieve identifier from Redis using `registration_session:<verificationToken>`. If expired/invalid → error `VERIFICATION_TOKEN_EXPIRED`.
+3. Validate password complexity (min 8 chars, 1 letter, 1 number).
+4. Hash password with bcrypt (salt rounds = 12).
+5. Save new user document in MongoDB (`role: customer`, `verified: true`).
+6. Delete `registration_session:<verificationToken>` from Redis.
+7. Issue Access Token + Refresh Token (in HTTP-only cookie).
 
-## 4. Password Rules
+## 4. SMS & Email Delivery Strategy (Handling Free / Paid OTPs)
 
-- Minimum 8 characters, at least one letter and one number.
-- Hashed with bcrypt, salt rounds = 12.
-- Plain-text password is never logged, never stored, never returned in any response.
+Because sending real SMS messages via telco gateways in Bangladesh (GP, Banglalink, Robi, Teletalk) incurs a per-SMS charge, **no real SMS will go to a physical phone number on free backend hosting (Render/Vercel) without a paid SMS Gateway API key**. 
 
-## 5. Login
+To handle both **Free Hosting / Demo Testing** and **Commercial Live Launch**, the backend implements a **Pluggable SMS Provider Adapter Pattern**:
+
+| Mode / Environment | Provider Impl | Behavior on Free Hosting / Staging |
+|---|---|---|
+| Development / Staging / Free Demo | `MockSmsProvider` | Logs OTP to Render logs (`[SMS MOCK] To: +88017... Code: 482910`). No SMS cost. If `ENABLE_DEMO_OTP=true`, accepts static OTP `123456` for easy demo testing. |
+| Automated Testing | `TestSmsProvider` | Stores OTP in memory for integration tests to verify. Zero cost. |
+| Production / Paid Launch | `BdSmsGatewayProvider` | Connects to Greenweb BD / BulkSMS BD / Twilio API when `SMS_GATEWAY_API_KEY` is configured in `.env`. Sends real SMS to handset. |
+| Email Identifier (Any Env) | `NodemailerEmailProvider` | Sends real OTP email via SMTP / Resend free tier (3,000 free emails/month). 100% Free! |
+
+> [!NOTE]
+> **Summary for Free Deployment**:
+> - **Email OTP**: Real emails WILL arrive in user's inbox 100% for free (via Resend/Gmail SMTP).
+> - **Phone OTP**: On free hosting, real SMS will NOT reach mobile handsets unless you buy BDT 200-500 SMS credits from Greenweb BD. Instead, the demo app allows testers to use the OTP logged in Render logs or a demo OTP (`123456`) when testing with phone numbers.
+
+## 5. Password Login
 
 **Endpoint:** `POST /api/v1/auth/login`
 
-1. Validate input.
-2. Find user by email/phone. If not found → generic `INVALID_CREDENTIALS` (never reveal which field was wrong).
-3. Compare password with bcrypt.
-4. If the account is not verified → prompt to verify (do not log in).
-5. On success, issue tokens (see below).
+1. Validate input (`identifier`, `password`).
+2. Normalize identifier and find user by `email` or `phone`.
+3. If user not found or password does not match → respond with generic `INVALID_CREDENTIALS` (401).
+4. On success, issue tokens and set HTTP-only Refresh Token cookie.
 
 ## 6. Token Strategy
 

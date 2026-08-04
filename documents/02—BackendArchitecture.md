@@ -70,14 +70,14 @@ Controller → Service → Repository → Database
 ```
 Repository throws (e.g. Mongoose CastError)
     ↓
-Service catches, translates into a typed AppError (e.g. NotFoundError, ValidationError)
+Service catches, translates into a typed AppError (e.g. NotFoundError, ValidationError, UnauthorizedError)
     ↓
 Controller does not catch — it awaits and lets errors propagate via next(err)
     ↓
 Central error-handling middleware formats the standard error response
 ```
 
-Controllers are wrapped in an `asyncHandler` utility so thrown/rejected errors are automatically forwarded to Express's error middleware — no repeated `try/catch` in every controller.
+Controllers are wrapped in an `asyncHandler` utility so thrown/rejected errors are automatically forwarded to Express's error middleware — eliminating repetitive `try/catch` blocks in controllers.
 
 ## 6. Response Flow
 
@@ -91,14 +91,30 @@ Every successful response uses the same envelope (see `07-api-design.md`):
 }
 ```
 
-## 7. Design Principles Applied
+## 7. Core Shared Utilities
+
+1. **`QueryBuilder` Utility (`src/utils/QueryBuilder.ts`)**:
+   - Reusable chainable helper wrapping Mongoose queries for all listing endpoints (`/products`, `/orders`, `/categories`, etc.).
+   - Supports `.search(['name', 'genericName'])`, `.filter()`, `.sort()`, `.paginate()`, `.fields()`.
+
+2. **`AppError` Custom Error Hierarchy (`src/utils/AppError.ts`)**:
+   - Subclasses: `NotFoundError` (404), `ValidationError` (400), `UnauthorizedError` (401), `ForbiddenError` (403), `ConflictError` (409).
+   - Carries HTTP status code, `errorCode` string, and structured error payloads for validation errors.
+
+3. **`asyncHandler` Utility (`src/utils/asyncHandler.ts`)**:
+   - Higher-order function `(fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)`.
+
+4. **PDF Invoice Generator (`src/utils/generateInvoice.ts`)**:
+   - Uses `pdfkit` to dynamically generate clean, printable PDF invoices for completed orders (`GET /orders/:id/invoice`).
+
+## 8. Design Principles Applied
 
 - **Single Responsibility** — each layer has exactly one reason to change.
-- **DRY** — shared logic (pagination, response formatting, error classes) lives in `utils/` and `shared/`, never copy-pasted per module.
-- **KISS** — prefer the simplest structure that satisfies the requirement; no speculative abstraction for features that don't exist yet.
-- **Open/Closed** — new modules are added without modifying existing ones; shared contracts (base repository, base error classes) are extended, not forked.
+- **DRY** — shared logic (query builder, pagination, response formatting, error classes, invoice generator) lives in `utils/` and `shared/`, never copy-pasted per module.
+- **KISS** — prefer the simplest structure that satisfies the requirement.
+- **Open/Closed** — new modules are added without modifying existing ones; shared contracts are extended, not forked.
 
-## 8. Folder-Level View
+## 9. Folder-Level View
 
 See `04-folder-structure.md` for the full directory tree. At a glance:
 

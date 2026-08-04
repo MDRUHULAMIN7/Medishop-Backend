@@ -14,6 +14,8 @@
 | `reviews` | Product reviews & ratings |
 | `prescriptions` | Uploaded prescription images + verification status |
 | `notifications` | User notification feed |
+| `banners` | Hero slider promotional banners |
+| `site_settings` | Dynamic branding, theme colors & contact info |
 
 ## 2. `users`
 
@@ -38,6 +40,7 @@
 | slug | String | unique, indexed |
 | parentCategory | ObjectId → categories | null for top-level |
 | image | String | Cloudinary URL |
+| isFeatured | Boolean | default false (highlights category on homepage) |
 | isActive | Boolean | default true |
 
 ## 4. `brands`
@@ -47,26 +50,36 @@
 | name | String | required, unique |
 | slug | String | unique, indexed |
 | logo | String | Cloudinary URL |
+| isFeatured | Boolean | default false (highlights brand on homepage) |
+| isActive | Boolean | default true |
 
 ## 5. `products`
 
 | Field | Type | Notes |
 |---|---|---|
-| name | String | required |
+| name | String | required (e.g. "Napa Extra 500mg") |
 | slug | String | unique, indexed |
-| description | String | |
+| genericName | String | e.g. "Paracetamol + Caffeine" (indexed) |
+| dosageForm | Enum | `tablet` \| `syrup` \| `capsule` \| `saline` \| `injection` \| `ointment` \| `drop` \| `inhaler` \| `powder` \| `suppository` \| `other` |
+| strength | String | e.g. "500mg + 65mg", "100ml" |
+| unitType | Enum | `pcs` \| `strip` \| `box` \| `bottle` \| `tube` \| `gm` \| `ml` \| `pack` (selling unit) |
+| packSize | String | e.g. "10 tablets per strip", "10 strips per box" |
+| description | String | full details, usage & side effects |
 | category | ObjectId → categories | indexed |
 | brand | ObjectId → brands | indexed |
-| price | Number | required |
+| price | Number | required (unit selling price) |
 | discountPrice | Number | optional |
 | stock | Number | required, ≥ 0 |
+| expiryDate | Date | optional/required batch expiry date |
+| batchNumber | String | optional batch tracking number |
 | images | String[] | Cloudinary URLs |
 | requiresPrescription | Boolean | default false |
+| isFeatured | Boolean | default false |
 | isActive | Boolean | default true |
 | ratingAverage | Number | denormalized from reviews |
 | ratingCount | Number | denormalized from reviews |
 
-**Indexes:** text index on `name` + `description` (search), compound index on `category + isActive`.
+**Indexes:** text index on `name` + `genericName` + `description` (search), compound index on `category + isActive`, `isFeatured`.
 
 ## 6. `carts`
 
@@ -136,7 +149,32 @@
 | isRead | Boolean | default false |
 | relatedOrder | ObjectId → orders | optional |
 
-## 12. Relationships Summary
+## 12. `banners` (Hero Slider)
+
+| Field | Type | Notes |
+|---|---|---|
+| title | String | optional banner header |
+| subtitle | String | optional banner subhead |
+| image | String | required Cloudinary URL |
+| linkUrl | String | optional target URL / product / category link |
+| displayOrder | Number | default 0 (sorting hero slider items) |
+| isActive | Boolean | default true |
+
+## 13. `site_settings` (Dynamic Branding & Colors)
+
+| Field | Type | Notes |
+|---|---|---|
+| siteName | String | e.g. "mediShop" |
+| logo | String | Cloudinary URL |
+| favicon | String | Cloudinary URL |
+| primaryColor | String | HEX / HSL primary theme color |
+| secondaryColor | String | HEX / HSL secondary theme color |
+| contactPhone | String | support hotline |
+| contactEmail | String | support email |
+| address | String | physical pharmacy address |
+| socialLinks | Object | `{ facebook, instagram, whatsapp }` |
+
+## 14. Relationships Summary
 
 ```
 users ──< orders ──< orderItems (snapshot of products)
@@ -147,9 +185,11 @@ products >── category
 products >── brand
 orders >── coupon (optional)
 orders >── prescription (optional, when required)
+banners (standalone collection)
+site_settings (singleton configuration record)
 ```
 
-## 13. Validation Rules (enforced at schema + Zod layer)
+## 15. Validation Rules (enforced at schema + Zod layer)
 
 - Prices, stock, and quantities are never negative.
 - `orders.items` is immutable once an order moves past `pending` — corrections happen via new orders/refunds, not edits.

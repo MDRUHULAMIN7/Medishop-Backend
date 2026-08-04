@@ -64,22 +64,27 @@ For validation errors, `errors` contains a field-level breakdown:
 | 429 | Too Many Requests | Rate limit exceeded |
 | 500 | Internal Server Error | Unhandled/unexpected errors |
 
-## 5. Pagination, Sorting, Filtering
+## 5. Server-Side QueryBuilder (Search, Filter, Sort, Pagination & Fields)
+
+All collection listing endpoints (`/products`, `/orders`, `/categories`, `/brands`, `/users`) use a reusable **`QueryBuilder`** class utility (`src/utils/QueryBuilder.ts`) wrapping Mongoose queries:
 
 ```
-GET /api/v1/products?page=1&limit=20&sort=-createdAt&category=vitamins&minPrice=100&maxPrice=500&search=paracetamol
+GET /api/v1/products?search=napa&category=665f1c...&dosageForm=tablet&sort=-price,createdAt&page=1&limit=20&fields=name,price,slug
 ```
 
-- `page` / `limit` — standard offset pagination, defaults `page=1`, `limit=20`, hard cap `limit<=100`.
-- `sort` — comma-separated fields, `-` prefix for descending.
-- Filters are module-specific query params validated against a Zod query schema per endpoint.
+- **`search(['name', 'genericName', 'description'])`**: Performs regex / text search over allowed fields.
+- **`filter()`**: Converts filter query parameters (excluding `sort`, `page`, `limit`, `fields`, `search`) into Mongoose query filters, supporting comparison operators (`minPrice` → `gte`, `maxPrice` → `lte`).
+- **`sort()`**: Accepts comma-separated fields (`sort=-price,createdAt`). Defaults to `-createdAt`.
+- **`paginate()`**: Standard offset pagination with `page` (default `1`) and `limit` (default `20`, hard cap `100`).
+- **`fields()`**: Selects specific response fields (`fields=name,price,slug` → `.select('name price slug')`).
 
 ## 6. Core Endpoint Reference
 
 ### Auth
 ```
-POST   /auth/register
+POST   /auth/check-identifier
 POST   /auth/verify-otp
+POST   /auth/complete-registration
 POST   /auth/login
 POST   /auth/refresh
 POST   /auth/logout
@@ -98,22 +103,41 @@ PATCH  /users/me/addresses/:addressId
 DELETE /users/me/addresses/:addressId
 ```
 
+### Banner (Hero Slider)
+```
+GET    /banners               (public — active hero sliders)
+POST   /banners               (admin — upload/create banner)
+PATCH  /banners/:id           (admin — update slider text, order, status)
+DELETE /banners/:id           (admin — remove banner)
+```
+
+### Site Settings & Branding
+```
+GET    /site-settings         (public — branding, logo, colors, contact info)
+PATCH  /site-settings         (admin — update site name, theme colors, contact info)
+```
+
 ### Category / Brand
 ```
-GET    /categories
+GET    /categories            (public — tree/list)
+GET    /categories/featured   (public — featured categories for homepage)
 POST   /categories            (admin)
-PATCH  /categories/:id        (admin)
+PATCH  /categories/:id        (admin — edit/feature toggle)
 DELETE /categories/:id        (admin)
-GET    /brands
+GET    /brands                (public — list)
+GET    /brands/featured       (public — featured brands)
 POST   /brands                (admin)
+PATCH  /brands/:id            (admin — edit/feature toggle)
+DELETE /brands/:id            (admin)
 ```
 
 ### Product
 ```
-GET    /products
-GET    /products/:slug
-POST   /products               (admin)
-PATCH  /products/:id           (admin)
+GET    /products               (public — filter by category, brand, genericName, dosageForm, unitType, isFeatured)
+GET    /products/featured      (public — homepage featured products)
+GET    /products/:slug         (public — detail with dosageForm, strength, unitType, packSize, expiryDate)
+POST   /products               (admin — create medicine with dosageForm, strength, unitType, expiryDate)
+PATCH  /products/:id           (admin — update product/stock/expiry)
 DELETE /products/:id           (admin)
 ```
 
@@ -146,6 +170,7 @@ GET    /coupons                        (admin)
 POST   /orders/checkout
 GET    /orders/me
 GET    /orders/:id
+GET    /orders/:id/invoice              (download PDF invoice receipt)
 PATCH  /orders/:id/cancel
 GET    /orders                          (admin — all orders)
 PATCH  /orders/:id/status               (admin — advance status)
@@ -200,3 +225,33 @@ Errors:
 
 - `POST /orders/checkout` accepts an optional `Idempotency-Key` header to safely handle client retries without creating duplicate orders.
 - All `PATCH`/`DELETE` admin actions on orders are logged with the acting admin's ID and timestamp for audit purposes.
+
+## 9. Interactive API Documentation (Swagger / OpenAPI 3.0)
+
+mediShop backend uses **Swagger UI** powered by `swagger-jsdoc` and `swagger-ui-express` for interactive API documentation and manual endpoint testing.
+
+### Access Routes
+- **Swagger UI Dashboard**: `GET /api/v1/docs`
+- **OpenAPI Spec (JSON)**: `GET /api/v1/docs.json`
+
+### Configuration (`src/config/swagger.ts`)
+- OpenAPI Spec Version: `3.0.0`
+- Authentication Security Definition:
+  ```json
+  "securitySchemes": {
+    "bearerAuth": {
+      "type": "http",
+      "scheme": "bearer",
+      "bearerFormat": "JWT"
+    }
+  }
+  ```
+- JSDoc Scanner Target: `src/modules/**/*.route.ts` and `src/modules/**/*.validation.ts`
+
+### Documentation Standard
+Every endpoint defined in `src/modules/<feature>/<feature>.route.ts` must include a `@openapi` JSDoc block describing:
+- **Tags**: Business module (e.g., `Auth`, `Products`, `Orders`)
+- **Summary & Description**: Purpose of the route
+- **Security**: `{ bearerAuth: [] }` for protected routes
+- **Request Body & Parameters**: Query parameters and body schemas
+- **Responses**: `200/201` standard success envelope and relevant `4xx/5xx` standard error envelopes

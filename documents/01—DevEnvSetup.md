@@ -9,7 +9,7 @@
 | Git | latest | Version control |
 | VS Code | latest | Editor |
 | MongoDB Compass (optional) | latest | GUI for local DB inspection |
-| Postman / Thunder Client | latest | API testing |
+| Postman / Thunder Client / Swagger UI | latest | API testing & interactive documentation |
 
 ## 2. Recommended VS Code Extensions
 
@@ -43,10 +43,13 @@ npm install socket.io
 npm install pino pino-http
 npm install express-rate-limit
 npm install nodemailer
+npm install pdfkit
+npm install swagger-ui-express swagger-jsdoc
 
 # Development dependencies
 npm install -D typescript ts-node-dev @types/node @types/express
-npm install -D @types/jsonwebtoken @types/bcrypt @types/cookie-parser @types/cors @types/multer
+npm install -D @types/jsonwebtoken @types/bcrypt @types/cookie-parser @types/cors @types/multer @types/pdfkit
+npm install -D @types/swagger-ui-express @types/swagger-jsdoc
 npm install -D eslint prettier eslint-config-prettier
 npm install -D husky lint-staged @commitlint/cli @commitlint/config-conventional
 npm install -D vitest supertest @types/supertest

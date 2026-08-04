@@ -18,18 +18,24 @@ The backend is built as a **feature-based modular monolith** — a single deploy
 
 ## 3. Functional Requirements
 
-- User registration & login (email/phone + OTP verification)
-- Browse products by category, brand, and search
-- Product detail with variants, stock, and prescription requirement flag
-- Cart management (add, update, remove, sync)
-- Prescription upload for prescription-required medicines
-- Coupon / discount code application
-- Checkout and order placement
-- Order tracking with real-time status updates
-- Order history and invoice
-- Product reviews and ratings
-- Notifications (order updates, offers)
-- Admin dashboard: manage products, categories, brands, orders, coupons, prescriptions, users
+- Single-input auth (Email or BD Phone + OTP / Password) with Nodemailer email OTP & demo/SMS provider adapter.
+- Hero slider banner management for homepage promotional sliders.
+- Dynamic site branding & settings (site name, logo, theme primary/secondary colors, contact info, social links).
+- Browse products by category, brand, generic name, dosage form, and text search.
+- Featured categories and brands management for homepage highlights.
+- Detailed medicine & product catalog management:
+  - Dosage Form (Syrup, Tablet, Capsule, Saline, Injection, Ointment, Drop, Inhaler, Powder, Suppository).
+  - Selling Unit & Packaging Options (Piece/Pcs, Strip/Pata, Box, Bottle, Tube, Weight gm/ml).
+  - Medicine Generic Name, Strength (e.g. 500mg), Expiry Date, Batch Number, and Prescription Requirement flag.
+- Cart management (add, update, remove, sync).
+- Prescription upload for prescription-required medicines with pharmacist review queue.
+- Coupon / discount code application.
+- Checkout and order placement with stock verification.
+- Order tracking with real-time status updates via Socket.IO.
+- Order history and invoice download.
+- Product reviews and verified ratings.
+- Notifications (order updates, prescription approval, promo offers).
+- Admin dashboard: manage banners, site branding, products, categories, brands, orders, coupons, prescriptions, users.
 
 ## 4. Non-Functional Requirements
 
@@ -50,6 +56,7 @@ The backend is built as a **feature-based modular monolith** — a single deploy
 | Database | MongoDB Atlas (via Mongoose) |
 | Cache / Session store | Redis Cloud |
 | Auth | JWT (access + refresh tokens), bcrypt |
+| API Documentation | Swagger / OpenAPI 3.0 (`swagger-ui-express`, `swagger-jsdoc`) |
 | Validation | Zod |
 | File storage | Cloudinary |
 | Realtime | Socket.IO |

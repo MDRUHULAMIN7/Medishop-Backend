@@ -32,6 +32,7 @@ Centralized, typed access to environment variables and app-wide constants.
 ```
 config/
 ├── env.ts          # reads & validates process.env with Zod, exports typed config object
+├── swagger.ts      # Swagger / OpenAPI specification & UI options configuration
 └── constants.ts     # app-wide constants (pagination defaults, token lifetimes)
 ```
 
@@ -52,6 +53,8 @@ modules/
 ├── review/
 ├── order/
 ├── notification/
+├── banner/
+├── site-setting/
 └── admin/
 ```
 
@@ -109,7 +112,12 @@ socket/
 
 ## 8. `utils/`
 
-Small, pure, reusable helper functions with no business meaning: `asyncHandler`, `ApiResponse`, `AppError`, `paginate`, `generateOtp`, `hashToken`.
+Small, reusable utility modules:
+- `QueryBuilder.ts` — reusable Mongoose chainable helper (`search`, `filter`, `sort`, `paginate`, `fields`) for server-side queries.
+- `asyncHandler.ts` — wraps async route handlers to automatically forward unhandled errors to `next(err)`.
+- `AppError.ts` — custom operational error class hierarchy (`AppError`, `NotFoundError`, `ValidationError`, `UnauthorizedError`, `ForbiddenError`, `ConflictError`).
+- `generateInvoice.ts` — PDFKit invoice stream builder for order receipts.
+- `ApiResponse.ts` — standard response envelope builder (`{ success, message, data, meta }`).
 
 ## 9. `shared/`
 

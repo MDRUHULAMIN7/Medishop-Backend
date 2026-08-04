@@ -39,10 +39,10 @@
 
 - Does this change respect the Controller → Service → Repository direction?
 - Does it introduce any `any`?
-- Are new endpoints validated, authenticated/authorized appropriately, and documented in `07-api-design.md`?
+- Are new endpoints validated, authenticated/authorized appropriately, documented in `07-api-design.md`, and annotated with Swagger `@openapi` comments in route files?
 - Are new Redis keys added through `redis/keys.ts` rather than inline strings?
 - Are tests included for new business logic?
 
 ## 6. Documentation Discipline
 
-Any change to an API contract, a database schema, or the authentication flow must be reflected in the corresponding chapter of this documentation set in the same pull request — the docs are not allowed to drift from the code.
+Any change to an API contract, a database schema, or the authentication flow must be reflected in the corresponding chapter of this documentation set as well as in the Swagger `@openapi` annotations in the route files within the same pull request — the docs and Swagger spec are not allowed to drift from the code.
