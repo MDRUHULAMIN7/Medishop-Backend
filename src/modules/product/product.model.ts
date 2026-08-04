@@ -39,6 +39,7 @@ const productSchema = new Schema<IProduct>(
     },
     packSize: { type: String, trim: true },
     description: { type: String, trim: true },
+    tags: { type: [String], default: [], index: true },
     category: { type: Schema.Types.ObjectId, ref: 'Category', required: true, index: true },
     brand: { type: Schema.Types.ObjectId, ref: 'Brand', required: true, index: true },
     price: { type: Number, required: true, min: 0 },
@@ -66,17 +67,19 @@ productSchema.index({ isFeatured: 1, isActive: 1 });
 productSchema.index({ dosageForm: 1, isActive: 1 });
 productSchema.index({ price: 1, isActive: 1 });
 
-// Full-Text Search Index across name, genericName, and description
+// Full-Text Search Index across name, genericName, tags, and description with field weighting
 productSchema.index(
   {
     name: 'text',
     genericName: 'text',
+    tags: 'text',
     description: 'text',
   },
   {
     weights: {
       name: 10,
       genericName: 5,
+      tags: 3,
       description: 1,
     },
     name: 'product_text_search',

@@ -4,19 +4,21 @@ import { slugify } from '../../utils/slug';
 import { brandRepository } from '../brand/brand.repository';
 import { categoryRepository } from '../category/category.repository';
 import { productRepository } from './product.repository';
-import { CreateProductInput, ProductFilterQuery, UpdateProductInput } from './product.types';
+import { CreateProductInput, ProductFilterQuery, SearchSuggestionItem, UpdateProductInput } from './product.types';
 
 const CACHE_KEYS = {
   LIST_PREFIX: 'cache:products:list:',
   FEATURED: 'cache:products:featured',
   DETAIL_PREFIX: 'cache:products:detail:',
+  SUGGESTIONS_PREFIX: 'cache:search:suggestions:',
 };
 
-const CACHE_TTL_SECONDS = 1800; // 30 minutes
+const CACHE_TTL_SECONDS = 1800; // 30 minutes for catalog list
+const SUGGESTION_TTL_SECONDS = 3600; // 1 hour for suggestions
 
 const clearProductCache = async () => {
   await deleteRedisCacheKeys(CACHE_KEYS.FEATURED);
-  // Note: List and Detail caches expire via TTL or selective prefix matching
+  // Catalog listing and search suggestion keys invalidate or expire via TTL
 };
 
 export class ProductService {
@@ -30,6 +32,23 @@ export class ProductService {
     const result = await productRepository.findWithFilters(query);
     await setRedisCache(cacheKey, result, CACHE_TTL_SECONDS);
     return result;
+  }
+
+  async getSearchSuggestions(queryText: string, limit = 8): Promise<SearchSuggestionItem[]> {
+    const trimmed = queryText.trim().toLowerCase();
+    if (!trimmed) {
+      return [];
+    }
+
+    const cacheKey = `${CACHE_KEYS.SUGGESTIONS_PREFIX}${trimmed}:${limit}`;
+    const cached = await getRedisCache<SearchSuggestionItem[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const suggestions = await productRepository.findSuggestions(trimmed, limit);
+    await setRedisCache(cacheKey, suggestions, SUGGESTION_TTL_SECONDS);
+    return suggestions;
   }
 
   async getFeaturedProducts(limit = 10) {

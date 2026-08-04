@@ -25,6 +25,7 @@ export interface IProduct {
   unitType: UnitType;
   packSize?: string;
   description?: string;
+  tags: string[];
   category: Types.ObjectId;
   brand: Types.ObjectId;
   price: number;
@@ -52,6 +53,7 @@ export interface ProductResponse {
   unitType: UnitType;
   packSize?: string;
   description?: string;
+  tags: string[];
   category: {
     id: string;
     name: string;
@@ -89,6 +91,7 @@ export interface CreateProductInput {
   unitType: UnitType;
   packSize?: string;
   description?: string;
+  tags?: string[];
   category: string;
   brand: string;
   price: number;
@@ -111,6 +114,7 @@ export interface UpdateProductInput {
   unitType?: UnitType;
   packSize?: string;
   description?: string;
+  tags?: string[];
   category?: string;
   brand?: string;
   price?: number;
@@ -138,4 +142,15 @@ export interface ProductFilterQuery {
   minPrice?: number;
   maxPrice?: number;
   includeInactive?: boolean;
+}
+
+export interface SearchSuggestionItem {
+  id: string;
+  type: 'product' | 'generic' | 'category' | 'brand';
+  text: string;
+  slug: string;
+  dosageForm?: DosageForm;
+  strength?: string;
+  categoryName?: string;
+  brandName?: string;
 }

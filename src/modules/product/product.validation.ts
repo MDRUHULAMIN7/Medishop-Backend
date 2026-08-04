@@ -34,6 +34,7 @@ export const createProductSchema = z.object({
   unitType: unitTypeEnum,
   packSize: z.string().optional(),
   description: z.string().optional(),
+  tags: z.union([z.array(z.string()), z.string()]).optional(),
   category: z.string().min(1, 'Category ID is required'),
   brand: z.string().min(1, 'Brand ID is required'),
   price: z.union([z.number().min(0), z.string().transform((val) => Number(val))]),
@@ -58,6 +59,7 @@ export const updateProductSchema = z.object({
   unitType: unitTypeEnum.optional(),
   packSize: z.string().optional(),
   description: z.string().optional(),
+  tags: z.union([z.array(z.string()), z.string()]).optional(),
   category: z.string().optional(),
   brand: z.string().optional(),
   price: z.union([z.number().min(0), z.string().transform((val) => Number(val))]).optional(),
@@ -95,4 +97,11 @@ export const productQuerySchema = z.object({
   minPrice: z.string().optional(),
   maxPrice: z.string().optional(),
   includeInactive: z.string().optional(),
+});
+
+export const searchSuggestionsQuerySchema = z.object({
+  q: z.string().optional(),
+  query: z.string().optional(),
+  search: z.string().optional(),
+  limit: z.string().optional(),
 });

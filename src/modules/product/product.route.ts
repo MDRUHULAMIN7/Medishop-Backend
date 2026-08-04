@@ -9,6 +9,7 @@ import {
   getFeaturedProducts,
   getProductByIdOrSlug,
   getProducts,
+  getSearchSuggestions,
   toggleFeaturedProduct,
   updateProduct,
 } from './product.controller';
@@ -17,6 +18,7 @@ import {
   productIdOrSlugSchema,
   productIdSchema,
   productQuerySchema,
+  searchSuggestionsQuerySchema,
   updateProductSchema,
 } from './product.validation';
 
@@ -26,14 +28,14 @@ const router = Router();
  * @openapi
  * /products:
  *   get:
- *     summary: List & search products with filtering, sorting, pagination (cached)
- *     tags: [Products]
+ *     summary: List & search products with relevance score ranking, filtering, sorting, pagination (cached)
+ *     tags: [Products & Search]
  *     parameters:
  *       - in: query
  *         name: search
  *         schema:
  *           type: string
- *         description: Full-text search keyword across name, genericName, description
+ *         description: Full-text search keyword across name, genericName, tags, description
  *       - in: query
  *         name: category
  *         schema:
@@ -85,10 +87,37 @@ router.get('/', validateRequest({ query: productQuerySchema }), getProducts);
 
 /**
  * @openapi
+ * /products/search/suggestions:
+ *   get:
+ *     summary: Fast auto-complete search suggestions (Redis cached)
+ *     tags: [Products & Search]
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: Search query prefix (e.g. "para", "napa")
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 8
+ *     responses:
+ *       200:
+ *         description: Search suggestions retrieved successfully
+ */
+router.get(
+  '/search/suggestions',
+  validateRequest({ query: searchSuggestionsQuerySchema }),
+  getSearchSuggestions
+);
+
+/**
+ * @openapi
  * /products/featured:
  *   get:
  *     summary: Get featured products for homepage (cached)
- *     tags: [Products]
+ *     tags: [Products & Search]
  *     parameters:
  *       - in: query
  *         name: limit
@@ -106,7 +135,7 @@ router.get('/featured', getFeaturedProducts);
  * /products/{idOrSlug}:
  *   get:
  *     summary: Get product details by ID or Slug
- *     tags: [Products]
+ *     tags: [Products & Search]
  *     parameters:
  *       - in: path
  *         name: idOrSlug
@@ -125,8 +154,8 @@ router.get('/:idOrSlug', validateRequest({ params: productIdOrSlugSchema }), get
  * @openapi
  * /products:
  *   post:
- *     summary: Create product with image upload (Admin only)
- *     tags: [Products]
+ *     summary: Create product with image upload & tags (Admin only)
+ *     tags: [Products & Search]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -153,6 +182,10 @@ router.get('/:idOrSlug', validateRequest({ params: productIdOrSlugSchema }), get
  *                 type: string
  *               description:
  *                 type: string
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
  *               category:
  *                 type: string
  *               brand:
@@ -199,7 +232,7 @@ router.post(
  * /products/{id}:
  *   patch:
  *     summary: Update product (Admin only)
- *     tags: [Products]
+ *     tags: [Products & Search]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -226,7 +259,7 @@ router.patch(
  * /products/{id}/toggle-feature:
  *   patch:
  *     summary: Toggle isFeatured status of a product (Admin only)
- *     tags: [Products]
+ *     tags: [Products & Search]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -252,7 +285,7 @@ router.patch(
  * /products/{id}:
  *   delete:
  *     summary: Delete product (Admin only)
- *     tags: [Products]
+ *     tags: [Products & Search]
  *     security:
  *       - bearerAuth: []
  *     parameters:

@@ -1,9 +1,12 @@
 import { FilterQuery, Types } from 'mongoose';
+import { BrandModel } from '../brand/brand.model';
+import { CategoryModel } from '../category/category.model';
 import { ProductModel } from './product.model';
 import {
   CreateProductInput,
   ProductFilterQuery,
   ProductResponse,
+  SearchSuggestionItem,
   UpdateProductInput,
 } from './product.types';
 
@@ -45,6 +48,7 @@ const toResponse = (product: any): ProductResponse => {
     unitType: product.unitType,
     packSize: product.packSize,
     description: product.description,
+    tags: Array.isArray(product.tags) ? product.tags : [],
     category: categoryObj,
     brand: brandObj,
     price,
@@ -111,29 +115,39 @@ export class ProductRepository {
       if (query.maxPrice !== undefined) filter.price.$lte = Number(query.maxPrice);
     }
 
-    if (query.search && query.search.trim()) {
-      filter.$text = { $search: query.search.trim() };
+    const hasSearch = Boolean(query.search && query.search.trim());
+    if (hasSearch) {
+      filter.$text = { $search: query.search!.trim() };
     }
 
-    // Sort mapping
-    let sortOptions: any = { createdAt: -1 };
-    if (query.sort) {
-      if (query.sort === 'price-asc') sortOptions = { price: 1 };
-      else if (query.sort === 'price-desc') sortOptions = { price: -1 };
-      else if (query.sort === 'rating') sortOptions = { ratingAverage: -1 };
-      else if (query.sort === 'name') sortOptions = { name: 1 };
-      else if (query.sort === '-createdAt') sortOptions = { createdAt: -1 };
-      else if (query.sort === 'createdAt') sortOptions = { createdAt: 1 };
+    // Determine sort options
+    let sortOptions: any = {};
+    let projection: any = null;
+
+    if (query.sort === 'price-asc') sortOptions = { price: 1 };
+    else if (query.sort === 'price-desc') sortOptions = { price: -1 };
+    else if (query.sort === 'rating') sortOptions = { ratingAverage: -1 };
+    else if (query.sort === 'name') sortOptions = { name: 1 };
+    else if (query.sort === '-createdAt') sortOptions = { createdAt: -1 };
+    else if (query.sort === 'createdAt') sortOptions = { createdAt: 1 };
+    else if (hasSearch) {
+      // Default to ranking by text search relevance score when searching
+      sortOptions = { score: { $meta: 'textScore' } };
+      projection = { score: { $meta: 'textScore' } };
+    } else {
+      sortOptions = { createdAt: -1 };
     }
+
+    let queryBuilder = ProductModel.find(filter, projection)
+      .populate('category', 'name slug')
+      .populate('brand', 'name slug logo')
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
     const [products, total] = await Promise.all([
-      ProductModel.find(filter)
-        .populate('category', 'name slug')
-        .populate('brand', 'name slug logo')
-        .sort(sortOptions)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+      queryBuilder,
       ProductModel.countDocuments(filter),
     ]);
 
@@ -146,6 +160,81 @@ export class ProductRepository {
         pages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async findSuggestions(rawQuery: string, limit = 8): Promise<SearchSuggestionItem[]> {
+    const q = rawQuery.trim();
+    if (!q) return [];
+
+    const regex = new RegExp(q, 'i');
+
+    const [products, categories, brands] = await Promise.all([
+      ProductModel.find(
+        { isActive: true, $or: [{ name: regex }, { genericName: regex }, { tags: regex }] },
+        { name: 1, slug: 1, genericName: 1, dosageForm: 1, strength: 1, category: 1, brand: 1 }
+      )
+        .populate('category', 'name')
+        .populate('brand', 'name')
+        .limit(limit)
+        .lean(),
+
+      CategoryModel.find({ isActive: true, name: regex }, { name: 1, slug: 1 }).limit(3).lean(),
+
+      BrandModel.find({ isActive: true, name: regex }, { name: 1, slug: 1 }).limit(3).lean(),
+    ]);
+
+    const suggestions: SearchSuggestionItem[] = [];
+
+    // Map Category matches
+    categories.forEach((cat: any) => {
+      suggestions.push({
+        id: cat._id.toString(),
+        type: 'category',
+        text: cat.name,
+        slug: cat.slug,
+      });
+    });
+
+    // Map Brand matches
+    brands.forEach((b: any) => {
+      suggestions.push({
+        id: b._id.toString(),
+        type: 'brand',
+        text: b.name,
+        slug: b.slug,
+      });
+    });
+
+    // Map Product matches & Generic name matches
+    const addedGenerics = new Set<string>();
+
+    products.forEach((prod: any) => {
+      // Add product suggestion
+      suggestions.push({
+        id: prod._id.toString(),
+        type: 'product',
+        text: prod.name,
+        slug: prod.slug,
+        dosageForm: prod.dosageForm,
+        strength: prod.strength,
+        categoryName: prod.category?.name,
+        brandName: prod.brand?.name,
+      });
+
+      // Add generic suggestion if matches and not duplicate
+      if (prod.genericName && regex.test(prod.genericName) && !addedGenerics.has(prod.genericName.toLowerCase())) {
+        addedGenerics.add(prod.genericName.toLowerCase());
+        suggestions.push({
+          id: `generic-${prod._id.toString()}`,
+          type: 'generic',
+          text: prod.genericName,
+          slug: prod.slug,
+          dosageForm: prod.dosageForm,
+        });
+      }
+    });
+
+    return suggestions.slice(0, limit);
   }
 
   async findFeatured(limit = 10) {
