@@ -1,6 +1,19 @@
 import { FilterQuery } from 'mongoose';
 import { UserModel } from './user.model';
-import { CreateUserInput, PublicUser, UpdatePasswordInput, UserDocumentData } from './user.types';
+import { CreateUserInput, PublicUser, UpdatePasswordInput, UserAddress, UserDocumentData } from './user.types';
+
+const mapAddress = (address: any): UserAddress => ({
+  id: address._id.toString(),
+  label: address.label,
+  recipientName: address.recipientName,
+  phone: address.phone,
+  division: address.division,
+  district: address.district,
+  thana: address.thana,
+  addressLine: address.addressLine,
+  postalCode: address.postalCode,
+  isDefault: address.isDefault,
+});
 
 const toPublicUser = (user: any): PublicUser => ({
   id: user._id.toString(),
@@ -9,7 +22,7 @@ const toPublicUser = (user: any): PublicUser => ({
   phone: user.phone,
   role: user.role,
   isVerified: user.isVerified,
-  addresses: user.addresses ?? [],
+  addresses: (user.addresses ?? []).map(mapAddress),
   lastLoginAt: user.lastLoginAt ?? null,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
@@ -50,6 +63,10 @@ export class UserRepository {
 
   async markLastLogin(userId: string) {
     return UserModel.findByIdAndUpdate(userId, { lastLoginAt: new Date() }, { new: true });
+  }
+
+  async updateProfile(userId: string, data: Partial<Pick<UserDocumentData, 'name' | 'email' | 'phone'>>) {
+    return UserModel.findByIdAndUpdate(userId, data, { new: true, runValidators: true });
   }
 
   async findByIdentifier(identifier: string, includePassword = false) {

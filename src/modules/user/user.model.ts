@@ -1,8 +1,8 @@
 import { Schema, model, models, HydratedDocument } from 'mongoose';
 import { ROLES } from '../../config/constants';
-import { UserAddress, UserDocumentData } from './user.types';
+import { UserAddressDocument, UserDocumentData } from './user.types';
 
-const userAddressSchema = new Schema<UserAddress>(
+const userAddressSchema = new Schema<UserAddressDocument>(
   {
     label: { type: String, trim: true },
     recipientName: { type: String, required: true, trim: true },
@@ -14,7 +14,7 @@ const userAddressSchema = new Schema<UserAddress>(
     postalCode: { type: String, trim: true },
     isDefault: { type: Boolean, default: false },
   },
-  { _id: false }
+  { timestamps: false }
 );
 
 const userSchema = new Schema<UserDocumentData>(

@@ -1,8 +1,9 @@
+import { Types } from 'mongoose';
 import { ROLES } from '../../config/constants';
 
 export type UserRole = (typeof ROLES)[keyof typeof ROLES];
 
-export interface UserAddress {
+export interface UserAddressInput {
   label?: string;
   recipientName: string;
   phone: string;
@@ -14,6 +15,14 @@ export interface UserAddress {
   isDefault?: boolean;
 }
 
+export interface UserAddressDocument extends UserAddressInput {
+  _id: Types.ObjectId;
+}
+
+export interface UserAddress extends UserAddressInput {
+  id: string;
+}
+
 export interface UserDocumentData {
   name: string;
   email?: string;
@@ -21,7 +30,7 @@ export interface UserDocumentData {
   password: string;
   role: UserRole;
   isVerified: boolean;
-  addresses: UserAddress[];
+  addresses: UserAddressDocument[];
   lastLoginAt?: Date | null;
   passwordChangedAt?: Date | null;
   createdAt?: Date;
@@ -55,3 +64,13 @@ export interface PublicUser {
   createdAt?: Date;
   updatedAt?: Date;
 }
+
+export interface UpdateProfileInput {
+  name?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface CreateAddressInput extends UserAddressInput {}
+
+export interface UpdateAddressInput extends Partial<UserAddressInput> {}
