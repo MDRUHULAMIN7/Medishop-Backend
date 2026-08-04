@@ -16,6 +16,19 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().default('medishop_refresh_secret_key_change_in_production_32chars'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   ENABLE_DEMO_OTP: z.string().default('true').transform((val) => val === 'true'),
+  COURIER_PROVIDER: z.enum(['mock', 'pathao']).default('mock'),
+  PATHAO_BASE_URL: z.string().default(''),
+  PATHAO_CLIENT_ID: z.string().default(''),
+  PATHAO_CLIENT_SECRET: z.string().default(''),
+  PATHAO_USERNAME: z.string().default(''),
+  PATHAO_PASSWORD: z.string().default(''),
+  PATHAO_STORE_ID: z.string().default(''),
+  PATHAO_TOKEN_PATH: z.string().default('/oauth/token'),
+  PATHAO_QUOTE_PATH: z.string().default('/delivery-fees/quote'),
+  PATHAO_SHIPMENT_PATH: z.string().default('/shipments'),
+  PATHAO_TRACKING_PATH: z.string().default('/shipments/:trackingNumber'),
+  PATHAO_CANCEL_PATH: z.string().default('/shipments/:trackingNumber/cancel'),
+  PATHAO_PICKUP_PATH: z.string().default('/pickups'),
 });
 
 const _env = envSchema.safeParse(process.env);

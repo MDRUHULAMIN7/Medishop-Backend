@@ -53,6 +53,7 @@ modules/
 ├── review/
 ├── order/
 ├── notification/
+├── courier/
 ├── banner/
 ├── site-setting/
 └── admin/

@@ -37,6 +37,21 @@ SMTP_USER=
 SMTP_PASS=
 OTP_EXPIRES_MINUTES=5
 
+# Courier / Pathao
+COURIER_PROVIDER=mock
+PATHAO_BASE_URL=
+PATHAO_CLIENT_ID=
+PATHAO_CLIENT_SECRET=
+PATHAO_USERNAME=
+PATHAO_PASSWORD=
+PATHAO_STORE_ID=
+PATHAO_TOKEN_PATH=/oauth/token
+PATHAO_QUOTE_PATH=/delivery-fees/quote
+PATHAO_SHIPMENT_PATH=/shipments
+PATHAO_TRACKING_PATH=/shipments/:trackingNumber
+PATHAO_CANCEL_PATH=/shipments/:trackingNumber/cancel
+PATHAO_PICKUP_PATH=/pickups
+
 # Rate Limiting
 RATE_LIMIT_WINDOW_MINUTES=15
 RATE_LIMIT_MAX_REQUESTS=100
@@ -119,6 +134,7 @@ SMTP_HOST, SMTP_USER, SMTP_PASS
 | `COOKIE_SECRET` | `middlewares/cookie` | Sign HTTP-only cookies |
 | `CLOUDINARY_*` | `modules/product`, `modules/prescription` | Image upload |
 | `SMTP_*` | `modules/auth` (OTP), `modules/notification` | Email delivery |
+| `COURIER_PROVIDER`, `PATHAO_*` | `modules/courier` | Courier quote / shipment / tracking / pickup integration |
 | `RATE_LIMIT_*` | `middlewares/rateLimiter` | Abuse prevention |
 
 ## 8. Environment Safety Rules

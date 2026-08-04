@@ -10,6 +10,7 @@ import { requestLogger } from './middlewares/requestLogger';
 import { errorHandler } from './middlewares/errorHandler';
 import { ApiResponse } from './utils/ApiResponse';
 import { NotFoundError } from './utils/AppError';
+import { registerModuleRoutes } from './modules';
 
 const app: Application = express();
 
@@ -26,6 +27,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
+registerModuleRoutes(app);
 
 // Health Check Endpoint
 /**

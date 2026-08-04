@@ -190,6 +190,18 @@ PATCH  /notifications/:id/read
 PATCH  /notifications/read-all
 ```
 
+### Courier
+```
+GET    /courier/providers
+GET    /courier/zones
+POST   /courier/rates
+POST   /courier/shipments
+GET    /courier/shipments
+GET    /courier/shipments/:trackingNumber
+POST   /courier/shipments/:trackingNumber/cancel
+POST   /courier/pickups
+```
+
 ## 7. Example — Endpoint Contract
 
 **`POST /api/v1/orders/checkout`**

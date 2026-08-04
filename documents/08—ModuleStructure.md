@@ -32,6 +32,7 @@ A module that doesn't own a collection (rare — most do) simply omits `<name>.m
 | `review` | `reviews` | `product`, `order` (verify purchase) |
 | `order` | `orders` | `cart`, `coupon`, `product`, `prescription`, `notification` |
 | `notification` | `notifications` | `socket` |
+| `courier` | — | `order` |
 | `admin` | — (orchestrates other modules' services) | all of the above |
 
 ## 3. Example — `product` Module Contract
