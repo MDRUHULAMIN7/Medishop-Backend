@@ -3,6 +3,7 @@ import authRouter from './auth/auth.route';
 import brandRouter from './brand/brand.route';
 import categoryRouter from './category/category.route';
 import courierRouter from './courier/courier.route';
+import productRouter from './product/product.route';
 import userRouter from './user/user.route';
 
 export const registerModuleRoutes = (app: Application) => {
@@ -10,5 +11,6 @@ export const registerModuleRoutes = (app: Application) => {
   app.use('/api/v1/users', userRouter);
   app.use('/api/v1/categories', categoryRouter);
   app.use('/api/v1/brands', brandRouter);
+  app.use('/api/v1/products', productRouter);
   app.use('/api/v1/courier', courierRouter);
 };
