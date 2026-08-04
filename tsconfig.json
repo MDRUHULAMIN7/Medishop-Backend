@@ -1,15 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "Node16",
+    "moduleResolution": "Node16",
     "ignoreDeprecations": "5.0",
     "rootDir": "./src",
     "outDir": "./dist",
-    "baseUrl": "./src",
-    "paths": {
-      "@/*": ["*"]
-    },
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,

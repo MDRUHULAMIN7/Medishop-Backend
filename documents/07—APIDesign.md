@@ -92,6 +92,7 @@ POST   /auth/forgot-password
 POST   /auth/verify-reset-otp
 POST   /auth/reset-password
 POST   /auth/change-password
+GET    /auth/me
 ```
 
 ### User

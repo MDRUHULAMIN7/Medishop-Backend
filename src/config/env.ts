@@ -29,6 +29,11 @@ const envSchema = z.object({
   PATHAO_TRACKING_PATH: z.string().default('/shipments/:trackingNumber'),
   PATHAO_CANCEL_PATH: z.string().default('/shipments/:trackingNumber/cancel'),
   PATHAO_PICKUP_PATH: z.string().default('/pickups'),
+  SMTP_HOST: z.string().default(''),
+  SMTP_PORT: z.string().default('587').transform((val) => parseInt(val, 10)),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASS: z.string().default(''),
+  SMTP_FROM: z.string().default('no-reply@medishop.com'),
 });
 
 const _env = envSchema.safeParse(process.env);
