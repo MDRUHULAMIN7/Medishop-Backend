@@ -3,6 +3,7 @@ import { authenticate } from '../../middlewares/authenticate';
 import { authorize } from '../../middlewares/authorize';
 import { upload } from '../../middlewares/upload';
 import { validateRequest } from '../../middlewares/validateRequest';
+import reviewRouter from '../review/review.route';
 import {
   createProduct,
   deleteProduct,
@@ -23,6 +24,9 @@ import {
 } from './product.validation';
 
 const router = Router();
+
+// Mount nested review sub-router on /products/:productId/reviews
+router.use('/:productId/reviews', reviewRouter);
 
 /**
  * @openapi
