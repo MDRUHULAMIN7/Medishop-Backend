@@ -8,10 +8,31 @@ export const updateProfileSchema = z
     name: z.string().trim().min(2, { message: 'Name must be at least 2 characters' }).optional(),
     email: z.string().trim().email({ message: 'Email must be valid' }).optional(),
     phone: z.string().trim().regex(bdPhoneRegex, { message: 'Phone must be a valid Bangladesh number' }).optional(),
+    avatar: z
+      .string()
+      .trim()
+      .max(5 * 1024 * 1024, { message: 'Avatar image string must not exceed 5MB' })
+      .optional()
+      .nullable(),
   })
-  .refine((value) => value.name !== undefined || value.email !== undefined || value.phone !== undefined, {
-    message: 'At least one profile field is required',
-  });
+  .refine(
+    (value) =>
+      value.name !== undefined ||
+      value.email !== undefined ||
+      value.phone !== undefined ||
+      value.avatar !== undefined,
+    {
+      message: 'At least one profile field is required',
+    }
+  );
+
+export const updateUserStatusSchema = z.object({
+  status: z.enum(['active', 'blocked'], { required_error: 'Status must be active or blocked' }),
+});
+
+export const userIdParamsSchema = z.object({
+  userId: z.string().regex(/^[0-9a-fA-F]{24}$/, { message: 'userId must be a valid Mongo ObjectId' }),
+});
 
 const addressShape = {
   label: z.string().trim().optional(),

@@ -1,5 +1,6 @@
 import { NotFoundError } from '../../utils/AppError';
 import { userRepository } from './user.repository';
+import { authRepository } from '../auth/auth.repository';
 import {
   CreateAddressInput,
   CreateUserInput,
@@ -8,6 +9,7 @@ import {
   UpdateProfileInput,
   UserAddressInput,
   UserRole,
+  UserStatus,
 } from './user.types';
 
 const normalizeEmail = (value: string) => value.trim().toLowerCase();
@@ -38,6 +40,7 @@ export class UserService {
     return userRepository.create({
       ...data,
       role: 'customer' as UserRole,
+      status: 'active',
       isVerified: true,
     });
   }
@@ -80,8 +83,50 @@ export class UserService {
       user.phone = normalizePhone(input.phone);
     }
 
+    if (input.avatar !== undefined) {
+      user.avatar = input.avatar ? input.avatar.trim() : null;
+    }
+
     const updatedUser = await user.save();
     return userRepository.toPublicUser(updatedUser);
+  }
+
+  async updateUserStatus(userId: string, status: UserStatus) {
+    const user = await userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found', 'USER_NOT_FOUND');
+    }
+
+    user.status = status;
+    const updatedUser = await user.save();
+
+    // If blocked, immediately revoke all refresh token sessions so user cannot refresh or continue session
+    if (status === 'blocked') {
+      await authRepository.revokeAllRefreshSessions(userId);
+    }
+
+    return userRepository.toPublicUser(updatedUser);
+  }
+
+  async listUsers(query: { page?: number; limit?: number; search?: string; status?: UserStatus; role?: UserRole }) {
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(100, Math.max(1, query.limit || 20));
+    const filter: any = {};
+
+    if (query.status) {
+      filter.status = query.status;
+    }
+
+    if (query.role) {
+      filter.role = query.role;
+    }
+
+    if (query.search) {
+      const searchRegex = new RegExp(query.search.trim(), 'i');
+      filter.$or = [{ name: searchRegex }, { email: searchRegex }, { phone: searchRegex }];
+    }
+
+    return userRepository.findAll(filter, page, limit);
   }
 
   async getAddresses(userId: string) {

@@ -29,6 +29,13 @@ const userSchema = new Schema<UserDocumentData>(
       default: ROLES.CUSTOMER,
       index: true,
     },
+    avatar: { type: String, default: null, trim: true },
+    status: {
+      type: String,
+      enum: ['active', 'blocked'],
+      default: 'active',
+      index: true,
+    },
     isVerified: { type: Boolean, default: false },
     addresses: { type: [userAddressSchema], default: [] },
     lastLoginAt: { type: Date, default: null },

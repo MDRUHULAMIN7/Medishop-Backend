@@ -1,6 +1,6 @@
 import { FilterQuery } from 'mongoose';
 import { UserModel } from './user.model';
-import { CreateUserInput, PublicUser, UpdatePasswordInput, UserAddress, UserDocumentData } from './user.types';
+import { CreateUserInput, PublicUser, UpdatePasswordInput, UserAddress, UserDocumentData, UserStatus } from './user.types';
 
 const mapAddress = (address: any): UserAddress => ({
   id: address._id.toString(),
@@ -21,6 +21,8 @@ const toPublicUser = (user: any): PublicUser => ({
   email: user.email,
   phone: user.phone,
   role: user.role,
+  avatar: user.avatar ?? null,
+  status: user.status ?? 'active',
   isVerified: user.isVerified,
   addresses: (user.addresses ?? []).map(mapAddress),
   lastLoginAt: user.lastLoginAt ?? null,
@@ -46,7 +48,11 @@ export class UserRepository {
   }
 
   async create(data: CreateUserInput) {
-    const created = await UserModel.create(data);
+    const created = await UserModel.create({
+      ...data,
+      avatar: data.avatar ?? null,
+      status: data.status ?? 'active',
+    });
     return created;
   }
 
@@ -65,8 +71,12 @@ export class UserRepository {
     return UserModel.findByIdAndUpdate(userId, { lastLoginAt: new Date() }, { new: true });
   }
 
-  async updateProfile(userId: string, data: Partial<Pick<UserDocumentData, 'name' | 'email' | 'phone'>>) {
+  async updateProfile(userId: string, data: Partial<Pick<UserDocumentData, 'name' | 'email' | 'phone' | 'avatar'>>) {
     return UserModel.findByIdAndUpdate(userId, data, { new: true, runValidators: true });
+  }
+
+  async updateStatus(userId: string, status: UserStatus) {
+    return UserModel.findByIdAndUpdate(userId, { status }, { new: true });
   }
 
   async findByIdentifier(identifier: string, includePassword = false) {
@@ -77,6 +87,15 @@ export class UserRepository {
   async existsByIdentifier(identifier: string) {
     const filter = identifier.includes('@') ? { email: identifier } : { phone: identifier };
     return UserModel.exists(filter);
+  }
+
+  async findAll(filter: FilterQuery<UserDocumentData> = {}, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [users, total] = await Promise.all([
+      UserModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      UserModel.countDocuments(filter),
+    ]);
+    return { users: users.map(toPublicUser), total, page, limit, pages: Math.ceil(total / limit) };
   }
 
   toPublicUser(user: any): PublicUser {

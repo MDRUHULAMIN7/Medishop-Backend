@@ -1,8 +1,26 @@
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/authenticate';
+import { authorize } from '../../middlewares/authorize';
 import { validateRequest } from '../../middlewares/validateRequest';
-import { addAddress, getAddresses, getMe, removeAddress, setDefaultAddress, updateAddress, updateMe } from './user.controller';
-import { addressIdParamsSchema, createAddressSchema, updateAddressSchema, updateProfileSchema } from './user.validation';
+import {
+  addAddress,
+  getAddresses,
+  getMe,
+  listUsers,
+  removeAddress,
+  setDefaultAddress,
+  updateAddress,
+  updateMe,
+  updateUserStatus,
+} from './user.controller';
+import {
+  addressIdParamsSchema,
+  createAddressSchema,
+  updateAddressSchema,
+  updateProfileSchema,
+  updateUserStatusSchema,
+  userIdParamsSchema,
+} from './user.validation';
 
 const router = Router();
 
@@ -26,7 +44,7 @@ router.get('/me', authenticate, getMe);
  * @openapi
  * /users/me:
  *   patch:
- *     summary: Update authenticated user profile
+ *     summary: Update authenticated user profile (name, email, phone, avatar)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -43,11 +61,83 @@ router.get('/me', authenticate, getMe);
  *                 type: string
  *               phone:
  *                 type: string
+ *               avatar:
+ *                 type: string
+ *                 description: Base64 or image URL string (max 5MB)
  *     responses:
  *       200:
  *         description: Profile updated successfully
  */
 router.patch('/me', authenticate, validateRequest({ body: updateProfileSchema }), updateMe);
+
+/**
+ * @openapi
+ * /users:
+ *   get:
+ *     summary: Admin - List all registered users
+ *     tags: [Users Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, blocked]
+ *     responses:
+ *       200:
+ *         description: List of users fetched successfully
+ */
+router.get('/', authenticate, authorize('admin'), listUsers);
+
+/**
+ * @openapi
+ * /users/{userId}/status:
+ *   patch:
+ *     summary: Admin - Block or unblock a user
+ *     tags: [Users Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [active, blocked]
+ *     responses:
+ *       200:
+ *         description: User status updated successfully
+ */
+router.patch(
+  '/:userId/status',
+  authenticate,
+  authorize('admin'),
+  validateRequest({ params: userIdParamsSchema, body: updateUserStatusSchema }),
+  updateUserStatus
+);
 
 /**
  * @openapi

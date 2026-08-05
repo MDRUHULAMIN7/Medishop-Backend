@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import { ROLES } from '../../config/constants';
 
 export type UserRole = (typeof ROLES)[keyof typeof ROLES];
+export type UserStatus = 'active' | 'blocked';
 
 export interface UserAddressInput {
   label?: string;
@@ -29,6 +30,8 @@ export interface UserDocumentData {
   phone?: string;
   password: string;
   role: UserRole;
+  avatar?: string | null;
+  status: UserStatus;
   isVerified: boolean;
   addresses: UserAddressDocument[];
   lastLoginAt?: Date | null;
@@ -43,6 +46,8 @@ export interface CreateUserInput {
   phone?: string;
   password: string;
   role?: UserRole;
+  avatar?: string | null;
+  status?: UserStatus;
   isVerified?: boolean;
 }
 
@@ -58,6 +63,8 @@ export interface PublicUser {
   email?: string;
   phone?: string;
   role: UserRole;
+  avatar?: string | null;
+  status: UserStatus;
   isVerified: boolean;
   addresses: UserAddress[];
   lastLoginAt?: Date | null;
@@ -69,6 +76,11 @@ export interface UpdateProfileInput {
   name?: string;
   email?: string;
   phone?: string;
+  avatar?: string | null;
+}
+
+export interface UpdateUserStatusInput {
+  status: UserStatus;
 }
 
 export interface CreateAddressInput extends UserAddressInput {}

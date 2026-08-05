@@ -131,6 +131,14 @@ export class AuthService {
       throw new AppError('Invalid credentials.', HTTP_STATUS.UNAUTHORIZED, 'INVALID_CREDENTIALS');
     }
 
+    if (user.status === 'blocked') {
+      throw new AppError(
+        'Your account has been blocked by an administrator. Please contact support.',
+        HTTP_STATUS.FORBIDDEN,
+        'ACCOUNT_BLOCKED'
+      );
+    }
+
     const isPasswordValid = await comparePassword(input.password, user.password);
     if (!isPasswordValid) {
       throw new AppError('Invalid credentials.', HTTP_STATUS.UNAUTHORIZED, 'INVALID_CREDENTIALS');
@@ -165,6 +173,15 @@ export class AuthService {
     if (!user) {
       await authRepository.revokeAllRefreshSessions(userId);
       throw new AppError('User not found.', HTTP_STATUS.UNAUTHORIZED, 'INVALID_TOKEN');
+    }
+
+    if (user.status === 'blocked') {
+      await authRepository.revokeAllRefreshSessions(userId);
+      throw new AppError(
+        'Your account has been blocked by an administrator. Please contact support.',
+        HTTP_STATUS.FORBIDDEN,
+        'ACCOUNT_BLOCKED'
+      );
     }
 
     const accessToken = createAccessToken(userId, role, sessionId);
@@ -276,6 +293,14 @@ export class AuthService {
     const user = await userService.findById(userId);
     if (!user) {
       throw new AppError('User not found.', HTTP_STATUS.NOT_FOUND, 'USER_NOT_FOUND');
+    }
+
+    if (user.status === 'blocked') {
+      throw new AppError(
+        'Your account has been blocked by an administrator. Please contact support.',
+        HTTP_STATUS.FORBIDDEN,
+        'ACCOUNT_BLOCKED'
+      );
     }
 
     return userService.toPublicUser(user);
