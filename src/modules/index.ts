@@ -6,6 +6,7 @@ import categoryRouter from './category/category.route';
 import couponRouter from './coupon/coupon.route';
 import courierRouter from './courier/courier.route';
 import orderRouter from './order/order.route';
+import posRouter from './pos/pos.route';
 import prescriptionRouter from './prescription/prescription.route';
 import productRouter from './product/product.route';
 import userRouter from './user/user.route';
@@ -20,5 +21,6 @@ export const registerModuleRoutes = (app: Application) => {
   app.use('/api/v1/coupons', couponRouter);
   app.use('/api/v1/prescriptions', prescriptionRouter);
   app.use('/api/v1/orders', orderRouter);
+  app.use('/api/v1/pos', posRouter);
   app.use('/api/v1/courier', courierRouter);
 };
