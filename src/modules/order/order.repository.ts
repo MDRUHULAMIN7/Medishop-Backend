@@ -1,6 +1,6 @@
 import { FilterQuery, Types } from 'mongoose';
 import { OrderModel } from './order.model';
-import { OrderResponse } from './order.types';
+import { OrderFilterQuery, OrderResponse, UpdateOrderStatusInput } from './order.types';
 
 const toResponse = (order: any): OrderResponse => ({
   id: order._id.toString(),
@@ -47,6 +47,10 @@ export class OrderRepository {
     return order ? toResponse(order) : null;
   }
 
+  async findRawById(id: string) {
+    return OrderModel.findById(id);
+  }
+
   async findByIdempotencyKey(key: string) {
     const order = await OrderModel.findOne({ idempotencyKey: key }).lean();
     return order ? toResponse(order) : null;
@@ -57,9 +61,47 @@ export class OrderRepository {
     return orders.map(toResponse);
   }
 
-  async findAll(filter: FilterQuery<any> = {}) {
-    const orders = await OrderModel.find(filter).sort({ createdAt: -1 }).lean();
-    return orders.map(toResponse);
+  async findWithFilters(query: OrderFilterQuery) {
+    const page = Math.max(Number(query.page || 1), 1);
+    const limit = Math.min(Math.max(Number(query.limit || 20), 1), 100);
+    const skip = (page - 1) * limit;
+
+    const filter: FilterQuery<any> = {};
+    if (query.orderStatus) {
+      filter.orderStatus = query.orderStatus;
+    }
+    if (query.paymentStatus) {
+      filter.paymentStatus = query.paymentStatus;
+    }
+
+    const [orders, total] = await Promise.all([
+      OrderModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      OrderModel.countDocuments(filter),
+    ]);
+
+    return {
+      orders: orders.map(toResponse),
+      meta: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async updateStatus(id: string, input: UpdateOrderStatusInput) {
+    const updatePayload: any = {};
+    if (input.orderStatus) updatePayload.orderStatus = input.orderStatus;
+    if (input.paymentStatus) updatePayload.paymentStatus = input.paymentStatus;
+    if (input.note) updatePayload.note = input.note;
+
+    const updated = await OrderModel.findByIdAndUpdate(id, updatePayload, {
+      new: true,
+      runValidators: true,
+    }).lean();
+
+    return updated ? toResponse(updated) : null;
   }
 }
 

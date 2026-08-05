@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/authenticate';
+import { authorize } from '../../middlewares/authorize';
 import { validateRequest } from '../../middlewares/validateRequest';
-import { checkout, getMyOrders, getOrderById } from './order.controller';
-import { checkoutSchema, orderIdSchema } from './order.validation';
+import { checkout, getAllOrders, getMyOrders, getOrderById, updateOrderStatus } from './order.controller';
+import { checkoutSchema, orderIdSchema, orderQuerySchema, updateOrderStatusSchema } from './order.validation';
 
 const router = Router();
 
@@ -14,7 +15,7 @@ router.use(authenticate);
  * /orders/checkout:
  *   post:
  *     summary: Process cart checkout and create new order (With Idempotency-Key support)
- *     tags: [Orders & Checkout]
+ *     tags: [Orders & Lifecycle]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -68,8 +69,8 @@ router.post('/checkout', validateRequest({ body: checkoutSchema }), checkout);
  * @openapi
  * /orders/my:
  *   get:
- *     summary: Get all orders for authenticated user
- *     tags: [Orders & Checkout]
+ *     summary: Get all orders for authenticated customer
+ *     tags: [Orders & Lifecycle]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -80,10 +81,40 @@ router.get('/my', getMyOrders);
 
 /**
  * @openapi
+ * /orders:
+ *   get:
+ *     summary: List all customer orders for Admin / Staff with filtering
+ *     tags: [Orders & Lifecycle]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: orderStatus
+ *         schema:
+ *           type: string
+ *           enum: [pending, processing, shipped, delivered, cancelled]
+ *       - in: query
+ *         name: paymentStatus
+ *         schema:
+ *           type: string
+ *           enum: [pending, paid, failed, refunded]
+ *     responses:
+ *       200:
+ *         description: Paginated list of all customer orders
+ */
+router.get(
+  '/',
+  authorize('admin', 'pharmacist'),
+  validateRequest({ query: orderQuerySchema }),
+  getAllOrders
+);
+
+/**
+ * @openapi
  * /orders/{id}:
  *   get:
  *     summary: Get order details by ID
- *     tags: [Orders & Checkout]
+ *     tags: [Orders & Lifecycle]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -97,5 +128,45 @@ router.get('/my', getMyOrders);
  *         description: Order details
  */
 router.get('/:id', validateRequest({ params: orderIdSchema }), getOrderById);
+
+/**
+ * @openapi
+ * /orders/{id}/status:
+ *   patch:
+ *     summary: Advance order through full lifecycle (Admin / Staff only, emits real-time Socket.io events)
+ *     tags: [Orders & Lifecycle]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               orderStatus:
+ *                 type: string
+ *                 enum: [pending, processing, shipped, delivered, cancelled]
+ *               paymentStatus:
+ *                 type: string
+ *                 enum: [pending, paid, failed, refunded]
+ *               note:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Order status updated and real-time socket event sent to customer
+ */
+router.patch(
+  '/:id/status',
+  authorize('admin', 'pharmacist'),
+  validateRequest({ params: orderIdSchema, body: updateOrderStatusSchema }),
+  updateOrderStatus
+);
 
 export default router;

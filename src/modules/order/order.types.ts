@@ -102,3 +102,16 @@ export interface OrderResponse {
   createdAt?: Date;
   updatedAt?: Date;
 }
+
+export interface UpdateOrderStatusInput {
+  orderStatus?: OrderStatus;
+  paymentStatus?: PaymentStatus;
+  note?: string;
+}
+
+export interface OrderFilterQuery {
+  orderStatus?: OrderStatus;
+  paymentStatus?: PaymentStatus;
+  page?: number;
+  limit?: number;
+}

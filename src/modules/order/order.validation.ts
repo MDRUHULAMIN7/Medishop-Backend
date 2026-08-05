@@ -20,6 +20,19 @@ export const checkoutSchema = z.object({
   note: z.string().optional(),
 });
 
+export const updateOrderStatusSchema = z.object({
+  orderStatus: z.enum(['pending', 'processing', 'shipped', 'delivered', 'cancelled']).optional(),
+  paymentStatus: z.enum(['pending', 'paid', 'failed', 'refunded']).optional(),
+  note: z.string().optional(),
+});
+
 export const orderIdSchema = z.object({
   id: z.string().min(1, 'Order ID is required'),
+});
+
+export const orderQuerySchema = z.object({
+  orderStatus: z.enum(['pending', 'processing', 'shipped', 'delivered', 'cancelled']).optional(),
+  paymentStatus: z.enum(['pending', 'paid', 'failed', 'refunded']).optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
 });

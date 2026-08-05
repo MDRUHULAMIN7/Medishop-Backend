@@ -24,3 +24,23 @@ export const getOrderById = asyncHandler(async (req: Request, res: Response) => 
   const order = await orderService.getOrderById(req.params.id);
   return ApiResponse.success(res, 'Order details fetched successfully', order);
 });
+
+export const getAllOrders = asyncHandler(async (req: Request, res: Response) => {
+  const result = await orderService.getAllOrders(req.query as any);
+  return ApiResponse.success(
+    res,
+    'All orders fetched successfully',
+    result.orders,
+    HTTP_STATUS.OK,
+    result.meta
+  );
+});
+
+export const updateOrderStatus = asyncHandler(async (req: Request, res: Response) => {
+  const order = await orderService.updateOrderStatus(req.params.id, req.user!.id, req.body);
+  return ApiResponse.success(
+    res,
+    `Order ${order.orderNumber} status updated to ${order.orderStatus}`,
+    order
+  );
+});

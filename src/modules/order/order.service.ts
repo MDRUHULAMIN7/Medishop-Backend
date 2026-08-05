@@ -1,14 +1,14 @@
-import { emitToAdmins } from '../../socket';
+import { emitToAdmins, emitToUser } from '../../socket';
 import { AppError, NotFoundError, ValidationError } from '../../utils/AppError';
-import { cartRepository } from '../cart/cart.repository';
 import { cartService } from '../cart/cart.service';
 import { couponRepository } from '../coupon/coupon.repository';
 import { couponService } from '../coupon/coupon.service';
+import { posRepository } from '../pos/pos.repository';
 import { prescriptionRepository } from '../prescription/prescription.repository';
 import { ProductModel } from '../product/product.model';
 import { userRepository } from '../user/user.repository';
 import { orderRepository } from './order.repository';
-import { CheckoutInput, OrderResponse } from './order.types';
+import { CheckoutInput, OrderFilterQuery, OrderResponse, UpdateOrderStatusInput } from './order.types';
 
 const generateOrderNumber = (): string => {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -120,6 +120,8 @@ export class OrderService {
 
     // 6. Final Stock Re-Check & Atomic Reservation / Lock
     const orderItemSnapshots = [];
+    const mainStore = await posRepository.findMainStore();
+
     for (const cartItem of cartResponse.items) {
       const product = await ProductModel.findOneAndUpdate(
         {
@@ -153,6 +155,17 @@ export class OrderService {
         totalPrice: cartItem.itemTotal,
         requiresPrescription: Boolean(product.requiresPrescription),
       });
+
+      // Write to Central Audit Stock Ledger
+      await posRepository.updateStock(
+        product._id.toString(),
+        mainStore._id.toString(),
+        -cartItem.quantity,
+        'online_order',
+        userId,
+        undefined,
+        `Online Order Checkout`
+      );
     }
 
     // 7. Calculate Final Financial Totals & Price Snapshot
@@ -191,10 +204,18 @@ export class OrderService {
     // 10. Clear User's Cart Exit Criteria
     await cartService.clearCart(userId);
 
-    // 11. Emit Socket Event to Admin / Order Queue
+    // 11. Emit Real-time Socket Events
     emitToAdmins('order:created', {
       event: 'order:created',
       message: `New Order ${order.orderNumber} placed for ৳${order.grandTotal}`,
+      order,
+    });
+
+    emitToUser(userId, 'order:updated', {
+      event: 'order:updated',
+      orderStatus: order.orderStatus,
+      paymentStatus: order.paymentStatus,
+      message: `Your Order ${order.orderNumber} has been placed successfully!`,
       order,
     });
 
@@ -211,6 +232,63 @@ export class OrderService {
       throw new NotFoundError('Order not found', 'ORDER_NOT_FOUND');
     }
     return order;
+  }
+
+  async getAllOrders(query: OrderFilterQuery) {
+    return orderRepository.findWithFilters(query);
+  }
+
+  async updateOrderStatus(id: string, staffId: string, input: UpdateOrderStatusInput) {
+    const rawOrder = await orderRepository.findRawById(id);
+    if (!rawOrder) {
+      throw new NotFoundError('Order not found', 'ORDER_NOT_FOUND');
+    }
+
+    const previousStatus = rawOrder.orderStatus;
+    const isCancelling = input.orderStatus === 'cancelled' && previousStatus !== 'cancelled';
+
+    // If order is cancelled, restore stock to Central Inventory & write to Stock Ledger
+    if (isCancelling) {
+      const mainStore = await posRepository.findMainStore();
+      for (const item of rawOrder.items) {
+        await ProductModel.findByIdAndUpdate(item.product, {
+          $inc: { stock: item.quantity },
+        });
+
+        await posRepository.updateStock(
+          item.product.toString(),
+          mainStore._id.toString(),
+          item.quantity,
+          'order_cancellation',
+          staffId,
+          rawOrder.orderNumber,
+          `Cancelled Order ${rawOrder.orderNumber} Stock Restoration`
+        );
+      }
+    }
+
+    const updatedOrder = await orderRepository.updateStatus(id, input);
+    if (!updatedOrder) {
+      throw new NotFoundError('Order not found', 'ORDER_NOT_FOUND');
+    }
+
+    // Emit Real-time Socket Event to Owning User
+    emitToUser(updatedOrder.userId, 'order:updated', {
+      event: 'order:updated',
+      orderStatus: updatedOrder.orderStatus,
+      paymentStatus: updatedOrder.paymentStatus,
+      message: `Your Order ${updatedOrder.orderNumber} status has been updated to "${updatedOrder.orderStatus}".`,
+      order: updatedOrder,
+    });
+
+    // Emit Real-time Socket Event to Admins
+    emitToAdmins('order:status_changed', {
+      event: 'order:status_changed',
+      message: `Order ${updatedOrder.orderNumber} updated to ${updatedOrder.orderStatus} (${updatedOrder.paymentStatus})`,
+      order: updatedOrder,
+    });
+
+    return updatedOrder;
   }
 }
 
