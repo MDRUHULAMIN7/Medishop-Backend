@@ -1,5 +1,6 @@
-import { emitToAdmins, emitToUser } from '../../socket';
+import { emitToAdmins } from '../../socket';
 import { AppError, NotFoundError, ValidationError } from '../../utils/AppError';
+import { notificationService } from '../notification/notification.service';
 import { prescriptionRepository } from './prescription.repository';
 import { CreatePrescriptionInput, PrescriptionFilterQuery, ReviewPrescriptionInput } from './prescription.types';
 
@@ -10,6 +11,15 @@ export class PrescriptionService {
     }
 
     const prescription = await prescriptionRepository.create(userId, input);
+
+    // Create & Persist Notification Feed Item
+    await notificationService.createAndSendNotification({
+      userId,
+      type: 'prescription_submitted',
+      title: 'Prescription Submitted',
+      message: 'Your prescription has been submitted and is currently being reviewed by our licensed pharmacist.',
+      data: { prescriptionId: prescription.id },
+    });
 
     // Emit real-time socket notification to Admin / Pharmacist review queue
     emitToAdmins('prescription:submitted', {
@@ -60,15 +70,20 @@ export class PrescriptionService {
       throw new NotFoundError('Prescription not found', 'PRESCRIPTION_NOT_FOUND');
     }
 
-    // Emit real-time socket notification to specific user
-    emitToUser(reviewed.user.id, 'prescription:updated', {
-      event: 'prescription:updated',
-      status: reviewed.status,
-      message:
-        reviewed.status === 'approved'
-          ? 'Your prescription has been approved by our pharmacist!'
-          : `Your prescription was rejected: ${reviewed.rejectionReason}`,
-      prescription: reviewed,
+    // Create & Persist Notification Feed Item (Exit Criteria)
+    const isApproved = reviewed.status === 'approved';
+    await notificationService.createAndSendNotification({
+      userId: reviewed.user.id,
+      type: isApproved ? 'prescription_approved' : 'prescription_rejected',
+      title: isApproved ? 'Prescription Approved' : 'Prescription Rejected',
+      message: isApproved
+        ? 'Your uploaded prescription has been verified and approved by our pharmacist! You can now proceed to checkout.'
+        : `Your prescription was rejected: ${reviewed.rejectionReason}`,
+      data: {
+        prescriptionId: reviewed.id,
+        status: reviewed.status,
+        rejectionReason: reviewed.rejectionReason,
+      },
     });
 
     return reviewed;

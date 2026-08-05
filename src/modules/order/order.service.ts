@@ -3,6 +3,7 @@ import { AppError, NotFoundError, ValidationError } from '../../utils/AppError';
 import { cartService } from '../cart/cart.service';
 import { couponRepository } from '../coupon/coupon.repository';
 import { couponService } from '../coupon/coupon.service';
+import { notificationService } from '../notification/notification.service';
 import { posRepository } from '../pos/pos.repository';
 import { prescriptionRepository } from '../prescription/prescription.repository';
 import { ProductModel } from '../product/product.model';
@@ -204,18 +205,19 @@ export class OrderService {
     // 10. Clear User's Cart Exit Criteria
     await cartService.clearCart(userId);
 
-    // 11. Emit Real-time Socket Events
+    // 11. Create & Persist Notification Feed Item (Exit Criteria)
+    await notificationService.createAndSendNotification({
+      userId,
+      type: 'order_created',
+      title: 'Order Placed Successfully',
+      message: `Your Order ${order.orderNumber} for ৳${order.grandTotal.toFixed(2)} has been placed successfully!`,
+      data: { orderId: order.id, orderNumber: order.orderNumber, grandTotal: order.grandTotal },
+    });
+
+    // 12. Emit Real-time Socket Event to Admins
     emitToAdmins('order:created', {
       event: 'order:created',
       message: `New Order ${order.orderNumber} placed for ৳${order.grandTotal}`,
-      order,
-    });
-
-    emitToUser(userId, 'order:updated', {
-      event: 'order:updated',
-      orderStatus: order.orderStatus,
-      paymentStatus: order.paymentStatus,
-      message: `Your Order ${order.orderNumber} has been placed successfully!`,
       order,
     });
 
@@ -272,13 +274,18 @@ export class OrderService {
       throw new NotFoundError('Order not found', 'ORDER_NOT_FOUND');
     }
 
-    // Emit Real-time Socket Event to Owning User
-    emitToUser(updatedOrder.userId, 'order:updated', {
-      event: 'order:updated',
-      orderStatus: updatedOrder.orderStatus,
-      paymentStatus: updatedOrder.paymentStatus,
-      message: `Your Order ${updatedOrder.orderNumber} status has been updated to "${updatedOrder.orderStatus}".`,
-      order: updatedOrder,
+    // Create & Persist Notification Feed Item (Exit Criteria)
+    await notificationService.createAndSendNotification({
+      userId: updatedOrder.userId,
+      type: 'order_status_updated',
+      title: 'Order Status Updated',
+      message: `Your Order ${updatedOrder.orderNumber} status is now "${updatedOrder.orderStatus}".`,
+      data: {
+        orderId: updatedOrder.id,
+        orderNumber: updatedOrder.orderNumber,
+        orderStatus: updatedOrder.orderStatus,
+        paymentStatus: updatedOrder.paymentStatus,
+      },
     });
 
     // Emit Real-time Socket Event to Admins
