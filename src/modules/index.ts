@@ -1,4 +1,5 @@
 import { Application } from 'express';
+import adminRouter from './admin/admin.route';
 import authRouter from './auth/auth.route';
 import brandRouter from './brand/brand.route';
 import cartRouter from './cart/cart.route';
@@ -24,5 +25,6 @@ export const registerModuleRoutes = (app: Application) => {
   app.use('/api/v1/orders', orderRouter);
   app.use('/api/v1/notifications', notificationRouter);
   app.use('/api/v1/pos', posRouter);
+  app.use('/api/v1/admin', adminRouter);
   app.use('/api/v1/courier', courierRouter);
 };
