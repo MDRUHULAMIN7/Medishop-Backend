@@ -14,6 +14,11 @@ export const updateMe = asyncHandler(async (req: Request, res: Response) => {
   return ApiResponse.success(res, 'Profile updated successfully', user, HTTP_STATUS.OK);
 });
 
+export const getUserById = asyncHandler(async (req: Request, res: Response) => {
+  const user = await userService.getUserById(req.params.userId);
+  return ApiResponse.success(res, 'User details fetched successfully', user);
+});
+
 export const updateUserStatus = asyncHandler(async (req: Request, res: Response) => {
   const user = await userService.updateUserStatus(req.params.userId, req.body.status);
   const actionText = req.body.status === 'blocked' ? 'blocked' : 'unblocked';

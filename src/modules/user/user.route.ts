@@ -6,6 +6,7 @@ import {
   addAddress,
   getAddresses,
   getMe,
+  getUserById,
   listUsers,
   removeAddress,
   setDefaultAddress,
@@ -28,7 +29,7 @@ const router = Router();
  * @openapi
  * /users/me:
  *   get:
- *     summary: Get authenticated user profile
+ *     summary: Get authenticated user profile (Includes addresses)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -74,7 +75,7 @@ router.patch('/me', authenticate, validateRequest({ body: updateProfileSchema })
  * @openapi
  * /users:
  *   get:
- *     summary: Admin - List all registered users
+ *     summary: Admin - List all registered users for table view (Lean user objects without heavy address arrays)
  *     tags: [Users Admin]
  *     security:
  *       - bearerAuth: []
@@ -96,11 +97,44 @@ router.patch('/me', authenticate, validateRequest({ body: updateProfileSchema })
  *         schema:
  *           type: string
  *           enum: [active, blocked]
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *           enum: [customer, admin, pharmacist]
  *     responses:
  *       200:
  *         description: List of users fetched successfully
  */
 router.get('/', authenticate, authorize('admin'), listUsers);
+
+/**
+ * @openapi
+ * /users/{userId}:
+ *   get:
+ *     summary: Admin - Get single user full details (Includes full addresses array and details)
+ *     tags: [Users Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User details fetched successfully
+ *       404:
+ *         description: User not found
+ */
+router.get(
+  '/:userId',
+  authenticate,
+  authorize('admin'),
+  validateRequest({ params: userIdParamsSchema }),
+  getUserById
+);
 
 /**
  * @openapi

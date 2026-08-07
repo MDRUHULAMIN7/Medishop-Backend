@@ -36,6 +36,14 @@ export class UserService {
     return userRepository.findById(userId, includePassword);
   }
 
+  async getUserById(userId: string) {
+    const user = await userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found', 'USER_NOT_FOUND');
+    }
+    return userRepository.toPublicUser(user, true);
+  }
+
   async createCustomer(data: Omit<CreateUserInput, 'role' | 'isVerified'>) {
     return userRepository.create({
       ...data,
@@ -62,7 +70,7 @@ export class UserService {
     if (!user) {
       throw new NotFoundError('User profile not found', 'USER_NOT_FOUND');
     }
-    return userRepository.toPublicUser(user);
+    return userRepository.toPublicUser(user, true);
   }
 
   async updateProfile(userId: string, input: UpdateProfileInput) {
@@ -88,7 +96,7 @@ export class UserService {
     }
 
     const updatedUser = await user.save();
-    return userRepository.toPublicUser(updatedUser);
+    return userRepository.toPublicUser(updatedUser, true);
   }
 
   async updateUserStatus(userId: string, status: UserStatus) {
@@ -105,7 +113,7 @@ export class UserService {
       await authRepository.revokeAllRefreshSessions(userId);
     }
 
-    return userRepository.toPublicUser(updatedUser);
+    return userRepository.toPublicUser(updatedUser, false);
   }
 
   async listUsers(query: { page?: number; limit?: number; search?: string; status?: UserStatus; role?: UserRole }) {
@@ -134,7 +142,7 @@ export class UserService {
     if (!user) {
       throw new NotFoundError('User profile not found', 'USER_NOT_FOUND');
     }
-    return userRepository.toPublicUser(user).addresses;
+    return userRepository.toPublicUser(user, true).addresses || [];
   }
 
   async addAddress(userId: string, input: CreateAddressInput) {
@@ -152,7 +160,7 @@ export class UserService {
 
     user.addresses.push(buildAddressPayload(input, shouldDefault) as any);
     const updatedUser = await user.save();
-    return userRepository.toPublicUser(updatedUser);
+    return userRepository.toPublicUser(updatedUser, true);
   }
 
   async updateAddress(userId: string, addressId: string, input: UpdateAddressInput) {
@@ -207,7 +215,7 @@ export class UserService {
     }
 
     const updatedUser = await user.save();
-    return userRepository.toPublicUser(updatedUser);
+    return userRepository.toPublicUser(updatedUser, true);
   }
 
   async removeAddress(userId: string, addressId: string) {
@@ -229,7 +237,7 @@ export class UserService {
     }
 
     const updatedUser = await user.save();
-    return userRepository.toPublicUser(updatedUser);
+    return userRepository.toPublicUser(updatedUser, true);
   }
 
   async setDefaultAddress(userId: string, addressId: string) {
@@ -249,11 +257,11 @@ export class UserService {
     address.isDefault = true;
 
     const updatedUser = await user.save();
-    return userRepository.toPublicUser(updatedUser);
+    return userRepository.toPublicUser(updatedUser, true);
   }
 
-  toPublicUser(user: any): PublicUser {
-    return userRepository.toPublicUser(user);
+  toPublicUser(user: any, includeAddresses = false): PublicUser {
+    return userRepository.toPublicUser(user, includeAddresses);
   }
 }
 

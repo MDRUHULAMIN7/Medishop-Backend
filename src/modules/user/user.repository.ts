@@ -15,20 +15,27 @@ const mapAddress = (address: any): UserAddress => ({
   isDefault: address.isDefault,
 });
 
-const toPublicUser = (user: any): PublicUser => ({
-  id: user._id.toString(),
-  name: user.name,
-  email: user.email,
-  phone: user.phone,
-  role: user.role,
-  avatar: user.avatar ?? null,
-  status: user.status ?? 'active',
-  isVerified: user.isVerified,
-  addresses: (user.addresses ?? []).map(mapAddress),
-  lastLoginAt: user.lastLoginAt ?? null,
-  createdAt: user.createdAt,
-  updatedAt: user.updatedAt,
-});
+const toPublicUser = (user: any, includeAddresses = false): PublicUser => {
+  const result: PublicUser = {
+    id: user._id.toString(),
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    avatar: user.avatar ?? null,
+    status: user.status ?? 'active',
+    isVerified: user.isVerified,
+    lastLoginAt: user.lastLoginAt ?? null,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+
+  if (includeAddresses && user.addresses) {
+    result.addresses = (user.addresses ?? []).map(mapAddress);
+  }
+
+  return result;
+};
 
 export class UserRepository {
   async findOne(filter: FilterQuery<UserDocumentData>, includePassword = false) {
@@ -95,11 +102,17 @@ export class UserRepository {
       UserModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
       UserModel.countDocuments(filter),
     ]);
-    return { users: users.map(toPublicUser), total, page, limit, pages: Math.ceil(total / limit) };
+    return {
+      users: users.map((user) => toPublicUser(user, false)),
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+    };
   }
 
-  toPublicUser(user: any): PublicUser {
-    return toPublicUser(user);
+  toPublicUser(user: any, includeAddresses = false): PublicUser {
+    return toPublicUser(user, includeAddresses);
   }
 }
 

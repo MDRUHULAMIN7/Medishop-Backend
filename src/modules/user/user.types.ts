@@ -66,7 +66,7 @@ export interface PublicUser {
   avatar?: string | null;
   status: UserStatus;
   isVerified: boolean;
-  addresses: UserAddress[];
+  addresses?: UserAddress[];
   lastLoginAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
