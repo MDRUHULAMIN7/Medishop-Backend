@@ -1,4 +1,4 @@
-import { NotFoundError } from '../../utils/AppError';
+import { NotFoundError, ValidationError } from '../../utils/AppError';
 import { userRepository } from './user.repository';
 import { authRepository } from '../auth/auth.repository';
 import {
@@ -83,12 +83,12 @@ export class UserService {
       user.name = input.name.trim();
     }
 
-    if (input.email !== undefined) {
-      user.email = normalizeEmail(input.email);
+    if (input.email !== undefined && input.email.trim().toLowerCase() !== (user.email || '').toLowerCase()) {
+      throw new ValidationError('Email address is locked and cannot be modified for security purposes');
     }
 
-    if (input.phone !== undefined) {
-      user.phone = normalizePhone(input.phone);
+    if (input.phone !== undefined && normalizePhone(input.phone) !== (user.phone || '')) {
+      throw new ValidationError('Mobile phone number is locked and cannot be modified for security purposes');
     }
 
     if (input.avatar !== undefined) {
