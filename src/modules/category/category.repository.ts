@@ -32,9 +32,21 @@ export class CategoryRepository {
   }
 
   async findByIdOrSlug(idOrSlug: string) {
-    const isObjectId = Types.ObjectId.isValid(idOrSlug);
-    const filter = isObjectId ? { _id: idOrSlug } : { slug: idOrSlug.toLowerCase() };
-    const category = await CategoryModel.findOne(filter).lean();
+    const isValidId = Types.ObjectId.isValid(idOrSlug) && /^[0-9a-fA-F]{24}$/.test(idOrSlug);
+    let category = null;
+    if (isValidId) {
+      category = await CategoryModel.findById(idOrSlug).lean();
+    }
+    if (!category) {
+      category = await CategoryModel.findOne({
+        $or: [
+          { slug: idOrSlug.toLowerCase() },
+          { name: idOrSlug },
+          { nameBn: idOrSlug },
+          { nameEn: idOrSlug },
+        ],
+      }).lean();
+    }
     return category ? toResponse(category) : null;
   }
 

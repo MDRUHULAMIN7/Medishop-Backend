@@ -47,10 +47,22 @@ export const createProduct = asyncHandler(async (req: Request, res: Response) =>
           .filter(Boolean)
     : [];
 
+  let unitPrices: any[] | undefined = undefined;
+  if (req.body.unitPrices) {
+    unitPrices = typeof req.body.unitPrices === 'string' ? JSON.parse(req.body.unitPrices) : req.body.unitPrices;
+  }
+
+  let packaging: any[] | undefined = undefined;
+  if (req.body.packaging) {
+    packaging = typeof req.body.packaging === 'string' ? JSON.parse(req.body.packaging) : req.body.packaging;
+  }
+
   const payload = {
     ...req.body,
     tags,
     images: imageUrls,
+    ...(unitPrices && { unitPrices }),
+    ...(packaging && { packaging }),
     price: Number(req.body.price),
     discountPrice: req.body.discountPrice ? Number(req.body.discountPrice) : undefined,
     stock: Number(req.body.stock),
@@ -82,10 +94,22 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response) =>
           .filter(Boolean)
     : undefined;
 
+  let unitPrices: any[] | undefined = undefined;
+  if (req.body.unitPrices) {
+    unitPrices = typeof req.body.unitPrices === 'string' ? JSON.parse(req.body.unitPrices) : req.body.unitPrices;
+  }
+
+  let packaging: any[] | undefined = undefined;
+  if (req.body.packaging) {
+    packaging = typeof req.body.packaging === 'string' ? JSON.parse(req.body.packaging) : req.body.packaging;
+  }
+
   const payload = {
     ...req.body,
     ...(tags !== undefined && { tags }),
     ...(imageUrls !== undefined && { images: imageUrls }),
+    ...(unitPrices !== undefined && { unitPrices }),
+    ...(packaging !== undefined && { packaging }),
     ...(req.body.price !== undefined && { price: Number(req.body.price) }),
     ...(req.body.discountPrice !== undefined && {
       discountPrice: req.body.discountPrice ? Number(req.body.discountPrice) : undefined,

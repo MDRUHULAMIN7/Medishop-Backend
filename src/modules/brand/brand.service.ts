@@ -12,7 +12,7 @@ const CACHE_KEYS = {
 const CACHE_TTL_SECONDS = 3600; // 1 hour
 
 const clearBrandCache = async () => {
-  await deleteRedisCacheKeys(CACHE_KEYS.ALL, CACHE_KEYS.FEATURED);
+  await deleteRedisCacheKeys(CACHE_KEYS.ALL, `${CACHE_KEYS.ALL}:admin`, CACHE_KEYS.FEATURED);
 };
 
 export class BrandService {

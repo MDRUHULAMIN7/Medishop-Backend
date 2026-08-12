@@ -27,9 +27,21 @@ export class BrandRepository {
   }
 
   async findByIdOrSlug(idOrSlug: string) {
-    const isObjectId = Types.ObjectId.isValid(idOrSlug);
-    const filter = isObjectId ? { _id: idOrSlug } : { slug: idOrSlug.toLowerCase() };
-    const brand = await BrandModel.findOne(filter).lean();
+    const isValidId = Types.ObjectId.isValid(idOrSlug) && /^[0-9a-fA-F]{24}$/.test(idOrSlug);
+    let brand = null;
+    if (isValidId) {
+      brand = await BrandModel.findById(idOrSlug).lean();
+    }
+    if (!brand) {
+      brand = await BrandModel.findOne({
+        $or: [
+          { slug: idOrSlug.toLowerCase() },
+          { name: idOrSlug },
+          { nameBn: idOrSlug },
+          { nameEn: idOrSlug },
+        ],
+      }).lean();
+    }
     return brand ? toResponse(brand) : null;
   }
 

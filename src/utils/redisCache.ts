@@ -28,3 +28,15 @@ export const deleteRedisCacheKeys = async (...keys: string[]): Promise<void> => 
     console.warn(`⚠️ Redis DEL error for keys "${keys.join(', ')}":`, (err as Error).message);
   }
 };
+
+export const deleteRedisCachePattern = async (pattern: string): Promise<void> => {
+  try {
+    if (!redisClient || redisClient.status !== 'ready') return;
+    const keys = await redisClient.keys(pattern);
+    if (keys && keys.length > 0) {
+      await redisClient.del(...keys);
+    }
+  } catch (err) {
+    console.warn(`⚠️ Redis DEL pattern error for "${pattern}":`, (err as Error).message);
+  }
+};

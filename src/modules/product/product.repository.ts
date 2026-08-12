@@ -38,6 +38,60 @@ const toResponse = (product: any): ProductResponse => {
         }
       : { id: product.brand?.toString() || '', name: '', slug: '', logo: '' };
 
+  const stockCached =
+    product.stockCached !== undefined && product.stockCached !== null
+      ? Number(product.stockCached)
+      : Number(product.stock || 0);
+
+  const rawPackaging =
+    Array.isArray(product.packaging) && product.packaging.length > 0
+      ? product.packaging.map((p: any) => ({
+          unit: p.unit || 'pcs',
+          baseUnitQty: Number(p.baseUnitQty || 1),
+          price: Number(p.price || price),
+          mrp: p.mrp ? Number(p.mrp) : Number(p.price || price),
+          discountPrice: p.discountPrice ? Number(p.discountPrice) : undefined,
+          barcode: p.barcode || undefined,
+          stock: Math.floor(stockCached / Number(p.baseUnitQty || 1)),
+          isDefault: Boolean(p.isDefault),
+          isActive: p.isActive !== false,
+        }))
+      : Array.isArray(product.unitPrices) && product.unitPrices.length > 0
+      ? product.unitPrices.map((u: any) => ({
+          unit: u.unit || product.unitType || 'pcs',
+          baseUnitQty: Number(u.multiplier || 1),
+          price: Number(u.price || price),
+          mrp: u.mrp ? Number(u.mrp) : Number(u.price || price),
+          discountPrice: u.discountPrice ? Number(u.discountPrice) : undefined,
+          stock: Math.floor(stockCached / Number(u.multiplier || 1)),
+          isDefault: Boolean(u.isDefault),
+          isActive: true,
+        }))
+      : [
+          {
+            unit: product.unitType || 'pcs',
+            baseUnitQty: 1,
+            price,
+            mrp: price,
+            discountPrice,
+            stock: stockCached,
+            isDefault: true,
+            isActive: true,
+          },
+        ];
+
+  const rawUnitPrices = rawPackaging.map((p: any) => ({
+    unit: p.unit,
+    unitLabelBn: p.unit === 'pcs' ? 'পিস' : p.unit === 'strip' ? 'পাতা' : p.unit === 'box' ? 'বক্স' : p.unit,
+    unitLabelEn: p.unit,
+    price: p.price,
+    mrp: p.mrp,
+    discountPrice: p.discountPrice,
+    stock: p.stock,
+    multiplier: p.baseUnitQty,
+    isDefault: p.isDefault,
+  }));
+
   return {
     id: product._id.toString(),
     name: product.name,
@@ -45,7 +99,11 @@ const toResponse = (product: any): ProductResponse => {
     genericName: product.genericName,
     dosageForm: product.dosageForm,
     strength: product.strength,
-    unitType: product.unitType,
+    baseUnit: product.baseUnit || 'pcs',
+    packaging: rawPackaging,
+    stockCached,
+    unitType: product.unitType || 'pcs',
+    unitPrices: rawUnitPrices,
     packSize: product.packSize,
     description: product.description,
     tags: Array.isArray(product.tags) ? product.tags : [],
@@ -54,8 +112,8 @@ const toResponse = (product: any): ProductResponse => {
     price,
     discountPrice,
     effectivePrice,
-    stock: Number(product.stock),
-    inStock: Number(product.stock) > 0,
+    stock: stockCached,
+    inStock: stockCached > 0,
     expiryDate: product.expiryDate ? new Date(product.expiryDate) : null,
     batchNumber: product.batchNumber,
     images: Array.isArray(product.images) ? product.images : [],
@@ -67,6 +125,10 @@ const toResponse = (product: any): ProductResponse => {
     createdAt: product.createdAt,
     updatedAt: product.updatedAt,
   };
+};
+
+const isValidObjectId = (val?: string): boolean => {
+  return Boolean(val && typeof val === 'string' && Types.ObjectId.isValid(val) && /^[0-9a-fA-F]{24}$/.test(val));
 };
 
 export class ProductRepository {
@@ -82,15 +144,43 @@ export class ProductRepository {
     }
 
     if (query.category) {
-      filter.category = Types.ObjectId.isValid(query.category)
-        ? new Types.ObjectId(query.category)
-        : query.category;
+      const catInput = String(query.category).trim();
+      if (isValidObjectId(catInput)) {
+        filter.category = new Types.ObjectId(catInput);
+      } else {
+        const catSlug = catInput.toLowerCase();
+        const cat = await CategoryModel.findOne({
+          $or: [
+            { slug: catSlug },
+            { name: new RegExp(`^${catSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          ],
+        });
+        if (cat) {
+          filter.category = cat._id;
+        } else {
+          filter.category = new Types.ObjectId();
+        }
+      }
     }
 
     if (query.brand) {
-      filter.brand = Types.ObjectId.isValid(query.brand)
-        ? new Types.ObjectId(query.brand)
-        : query.brand;
+      const brandInput = String(query.brand).trim();
+      if (isValidObjectId(brandInput)) {
+        filter.brand = new Types.ObjectId(brandInput);
+      } else {
+        const brandSlug = brandInput.toLowerCase();
+        const brandObj = await BrandModel.findOne({
+          $or: [
+            { slug: brandSlug },
+            { name: new RegExp(`^${brandSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          ],
+        });
+        if (brandObj) {
+          filter.brand = brandObj._id;
+        } else {
+          filter.brand = new Types.ObjectId();
+        }
+      }
     }
 
     if (query.dosageForm) {
@@ -117,7 +207,17 @@ export class ProductRepository {
 
     const hasSearch = Boolean(query.search && query.search.trim());
     if (hasSearch) {
-      filter.$text = { $search: query.search!.trim() };
+      const q = query.search!.trim();
+      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escaped, 'i');
+
+      filter.$or = [
+        { name: searchRegex },
+        { genericName: searchRegex },
+        { tags: searchRegex },
+        { dosageForm: searchRegex },
+        { strength: searchRegex },
+      ];
     }
 
     // Determine sort options
@@ -130,15 +230,38 @@ export class ProductRepository {
     else if (query.sort === 'name') sortOptions = { name: 1 };
     else if (query.sort === '-createdAt') sortOptions = { createdAt: -1 };
     else if (query.sort === 'createdAt') sortOptions = { createdAt: 1 };
-    else if (hasSearch) {
-      // Default to ranking by text search relevance score when searching
-      sortOptions = { score: { $meta: 'textScore' } };
-      projection = { score: { $meta: 'textScore' } };
-    } else {
+    else {
       sortOptions = { createdAt: -1 };
     }
 
-    let queryBuilder = ProductModel.find(filter, projection)
+    const summaryProjection: any = projection ? { ...projection } : {};
+    summaryProjection.name = 1;
+    summaryProjection.slug = 1;
+    summaryProjection.genericName = 1;
+    summaryProjection.dosageForm = 1;
+    summaryProjection.strength = 1;
+    summaryProjection.baseUnit = 1;
+    summaryProjection.unitType = 1;
+    summaryProjection.packaging = 1;
+    summaryProjection.unitPrices = 1;
+    summaryProjection.stockCached = 1;
+    summaryProjection.stock = 1;
+    summaryProjection.category = 1;
+    summaryProjection.brand = 1;
+    summaryProjection.price = 1;
+    summaryProjection.discountPrice = 1;
+    summaryProjection.expiryDate = 1;
+    summaryProjection.batchNumber = 1;
+    summaryProjection.images = { $slice: 1 };
+    summaryProjection.requiresPrescription = 1;
+    summaryProjection.isFeatured = 1;
+    summaryProjection.isActive = 1;
+    summaryProjection.ratingAverage = 1;
+    summaryProjection.ratingCount = 1;
+    summaryProjection.createdAt = 1;
+    summaryProjection.updatedAt = 1;
+
+    let queryBuilder = ProductModel.find(filter, summaryProjection)
       .populate('category', 'name slug')
       .populate('brand', 'name slug logo')
       .sort(sortOptions)
@@ -166,7 +289,8 @@ export class ProductRepository {
     const q = rawQuery.trim();
     if (!q) return [];
 
-    const regex = new RegExp(q, 'i');
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
 
     const [products, categories, brands] = await Promise.all([
       ProductModel.find(
@@ -268,10 +392,40 @@ export class ProductRepository {
   }
 
   async create(data: CreateProductInput) {
+    const rawTiers = Array.isArray((data as any).packaging) && (data as any).packaging.length > 0
+      ? (data as any).packaging
+      : Array.isArray((data as any).unitPrices) && (data as any).unitPrices.length > 0
+      ? (data as any).unitPrices
+      : [];
+
+    const packaging = rawTiers.map((p: any) => ({
+      unit: p.unit || 'pcs',
+      baseUnitQty: Number(p.baseUnitQty || p.multiplier || 1),
+      price: Number(p.price || data.price || 0),
+      mrp: p.mrp ? Number(p.mrp) : Number(p.price || data.price || 0),
+      discountPrice: p.discountPrice ? Number(p.discountPrice) : undefined,
+      barcode: p.barcode || undefined,
+      isDefault: Boolean(p.isDefault),
+      isActive: p.isActive !== false,
+    }));
+
+    const unitPrices = packaging.map((p: any) => ({
+      unit: p.unit,
+      unitLabelBn: p.unit === 'pcs' ? 'পিস' : p.unit === 'strip' ? 'পাতা' : p.unit === 'box' ? 'বক্স' : p.unit === 'bottle' ? 'বোতল' : p.unit === 'tube' ? 'টিউব' : p.unit === 'pack' ? 'প্যাক' : p.unit,
+      unitLabelEn: p.unit,
+      price: p.price,
+      mrp: p.mrp,
+      discountPrice: p.discountPrice,
+      stock: 0,
+      multiplier: p.baseUnitQty,
+      isDefault: p.isDefault,
+    }));
+
     const product = await ProductModel.create({
       ...data,
       category: new Types.ObjectId(data.category),
       brand: new Types.ObjectId(data.brand),
+      ...(packaging.length > 0 && { packaging, unitPrices }),
       expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
     });
 
@@ -289,6 +443,45 @@ export class ProductRepository {
     if (data.brand) updatePayload.brand = new Types.ObjectId(data.brand);
     if (data.expiryDate !== undefined) {
       updatePayload.expiryDate = data.expiryDate ? new Date(data.expiryDate) : null;
+    }
+
+    if (data.stock !== undefined) {
+      updatePayload.stockCached = Number(data.stock);
+      updatePayload.stock = Number(data.stock);
+    }
+
+    const rawTiers = Array.isArray((data as any).packaging) && (data as any).packaging.length > 0
+      ? (data as any).packaging
+      : Array.isArray((data as any).unitPrices) && (data as any).unitPrices.length > 0
+      ? (data as any).unitPrices
+      : null;
+
+    if (rawTiers && rawTiers.length > 0) {
+      const packaging = rawTiers.map((p: any) => ({
+        unit: p.unit || 'pcs',
+        baseUnitQty: Number(p.baseUnitQty || p.multiplier || 1),
+        price: Number(p.price || data.price || 0),
+        mrp: p.mrp ? Number(p.mrp) : Number(p.price || data.price || 0),
+        discountPrice: p.discountPrice ? Number(p.discountPrice) : undefined,
+        barcode: p.barcode || undefined,
+        isDefault: Boolean(p.isDefault),
+        isActive: p.isActive !== false,
+      }));
+
+      const unitPrices = packaging.map((p: any) => ({
+        unit: p.unit,
+        unitLabelBn: p.unit === 'pcs' ? 'পিস' : p.unit === 'strip' ? 'পাতা' : p.unit === 'box' ? 'বক্স' : p.unit === 'bottle' ? 'বোতল' : p.unit === 'tube' ? 'টিউব' : p.unit === 'pack' ? 'প্যাক' : p.unit,
+        unitLabelEn: p.unit,
+        price: p.price,
+        mrp: p.mrp,
+        discountPrice: p.discountPrice,
+        stock: 0,
+        multiplier: p.baseUnitQty,
+        isDefault: p.isDefault,
+      }));
+
+      updatePayload.packaging = packaging;
+      updatePayload.unitPrices = unitPrices;
     }
 
     const updated = await ProductModel.findByIdAndUpdate(id, updatePayload, {

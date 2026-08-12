@@ -25,13 +25,42 @@ const unitTypeEnum = z.enum([
   'pack',
 ]);
 
+// Reusable packaging tier schema (maps to product.model.ts packaging[] subdoc)
+const packagingTierSchema = z.object({
+  unit: unitTypeEnum,
+  baseUnitQty: z.union([z.number().min(1), z.string().transform((v) => Number(v))]).optional().default(1),
+  price: z.union([z.number().min(0), z.string().transform((v) => Number(v))]),
+  mrp: z.union([z.number().min(0), z.string().transform((v) => Number(v))]).optional(),
+  discountPrice: z.union([z.number().min(0), z.string().transform((v) => (v ? Number(v) : undefined))]).optional(),
+  barcode: z.string().optional(),
+  isDefault: z.union([z.boolean(), z.string().transform((v) => v === 'true')]).optional().default(false),
+  isActive: z.union([z.boolean(), z.string().transform((v) => v !== 'false')]).optional().default(true),
+});
+
+// Reusable unit price tier schema (maps to product.model.ts unitPrices[] subdoc)
+const unitPriceTierSchema = z.object({
+  unit: unitTypeEnum,
+  baseUnitQty: z.union([z.number().min(1), z.string().transform((v) => Number(v))]).optional().default(1),
+  unitLabelBn: z.string().optional(),
+  unitLabelEn: z.string().optional(),
+  price: z.union([z.number().min(0), z.string().transform((v) => Number(v))]),
+  mrp: z.union([z.number().min(0), z.string().transform((v) => Number(v))]).optional(),
+  discountPrice: z.union([z.number().min(0), z.string().transform((v) => (v ? Number(v) : undefined))]).optional(),
+  stock: z.union([z.number().min(0), z.string().transform((v) => Number(v))]).optional().default(0),
+  multiplier: z.union([z.number().min(1), z.string().transform((v) => Number(v))]).optional().default(1),
+  isDefault: z.union([z.boolean(), z.string().transform((v) => v === 'true')]).optional().default(false),
+});
+
 export const createProductSchema = z.object({
   name: z.string().min(2, 'Product name must be at least 2 characters').max(200),
   slug: z.string().optional(),
   genericName: z.string().optional(),
   dosageForm: dosageFormEnum,
   strength: z.string().optional(),
+  baseUnit: z.enum(['pcs', 'ml', 'gm']).optional().default('pcs'),
   unitType: unitTypeEnum,
+  packaging: z.array(packagingTierSchema).optional(),
+  unitPrices: z.array(unitPriceTierSchema).optional(),
   packSize: z.string().optional(),
   description: z.string().optional(),
   tags: z.union([z.array(z.string()), z.string()]).optional(),
@@ -44,7 +73,7 @@ export const createProductSchema = z.object({
   stock: z.union([z.number().min(0), z.string().transform((val) => Number(val))]),
   expiryDate: z.string().nullable().optional(),
   batchNumber: z.string().optional(),
-  images: z.array(z.string().url()).optional(),
+  images: z.array(z.string()).optional(),
   requiresPrescription: z.union([z.boolean(), z.string().transform((v) => v === 'true')]).optional(),
   isFeatured: z.union([z.boolean(), z.string().transform((v) => v === 'true')]).optional(),
   isActive: z.union([z.boolean(), z.string().transform((v) => v !== 'false')]).optional(),
@@ -56,7 +85,10 @@ export const updateProductSchema = z.object({
   genericName: z.string().optional(),
   dosageForm: dosageFormEnum.optional(),
   strength: z.string().optional(),
+  baseUnit: z.enum(['pcs', 'ml', 'gm']).optional(),
   unitType: unitTypeEnum.optional(),
+  packaging: z.array(packagingTierSchema).optional(),
+  unitPrices: z.array(unitPriceTierSchema).optional(),
   packSize: z.string().optional(),
   description: z.string().optional(),
   tags: z.union([z.array(z.string()), z.string()]).optional(),
@@ -69,7 +101,7 @@ export const updateProductSchema = z.object({
   stock: z.union([z.number().min(0), z.string().transform((val) => Number(val))]).optional(),
   expiryDate: z.string().nullable().optional(),
   batchNumber: z.string().optional(),
-  images: z.array(z.string().url()).optional(),
+  images: z.array(z.string()).optional(),
   requiresPrescription: z.union([z.boolean(), z.string().transform((v) => v === 'true')]).optional(),
   isFeatured: z.union([z.boolean(), z.string().transform((v) => v === 'true')]).optional(),
   isActive: z.union([z.boolean(), z.string().transform((v) => v === 'true')]).optional(),

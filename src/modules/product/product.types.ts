@@ -15,6 +15,29 @@ export type DosageForm =
 
 export type UnitType = 'pcs' | 'strip' | 'box' | 'bottle' | 'tube' | 'gm' | 'ml' | 'pack';
 
+export interface IUnitPriceOption {
+  unit: UnitType;
+  unitLabelBn?: string;
+  unitLabelEn?: string;
+  price: number;
+  mrp?: number;
+  discountPrice?: number;
+  stock: number;
+  multiplier?: number;
+  isDefault?: boolean;
+}
+
+export interface IPackagingUnit {
+  unit: UnitType;
+  baseUnitQty: number; // how many baseUnits in 1 unit (box=100, strip=10, pcs=1)
+  price: number;
+  mrp?: number;
+  discountPrice?: number;
+  barcode?: string;
+  isDefault: boolean;
+  isActive: boolean;
+}
+
 export interface IProduct {
   _id: Types.ObjectId;
   name: string;
@@ -22,7 +45,12 @@ export interface IProduct {
   genericName?: string;
   dosageForm: DosageForm;
   strength?: string;
+  baseUnit: 'pcs' | 'ml' | 'gm';
+  packaging: IPackagingUnit[];
+  stockCached: number; // denormalized stock in baseUnit
+  lowStockThreshold: number;
   unitType: UnitType;
+  unitPrices?: IUnitPriceOption[];
   packSize?: string;
   description?: string;
   tags: string[];
@@ -50,7 +78,12 @@ export interface ProductResponse {
   genericName?: string;
   dosageForm: DosageForm;
   strength?: string;
+  baseUnit?: 'pcs' | 'ml' | 'gm';
+  packaging?: IPackagingUnit[];
+  stockCached?: number;
+  lowStockThreshold?: number;
   unitType: UnitType;
+  unitPrices: IUnitPriceOption[];
   packSize?: string;
   description?: string;
   tags: string[];
@@ -88,7 +121,12 @@ export interface CreateProductInput {
   genericName?: string;
   dosageForm: DosageForm;
   strength?: string;
-  unitType: UnitType;
+  baseUnit?: 'pcs' | 'ml' | 'gm';
+  packaging?: IPackagingUnit[];
+  stockCached?: number;
+  lowStockThreshold?: number;
+  unitType?: UnitType;
+  unitPrices?: IUnitPriceOption[];
   packSize?: string;
   description?: string;
   tags?: string[];
@@ -96,7 +134,7 @@ export interface CreateProductInput {
   brand: string;
   price: number;
   discountPrice?: number;
-  stock: number;
+  stock?: number;
   expiryDate?: string | Date | null;
   batchNumber?: string;
   images?: string[];
@@ -111,7 +149,12 @@ export interface UpdateProductInput {
   genericName?: string;
   dosageForm?: DosageForm;
   strength?: string;
+  baseUnit?: 'pcs' | 'ml' | 'gm';
+  packaging?: IPackagingUnit[];
+  stockCached?: number;
+  lowStockThreshold?: number;
   unitType?: UnitType;
+  unitPrices?: IUnitPriceOption[];
   packSize?: string;
   description?: string;
   tags?: string[];
