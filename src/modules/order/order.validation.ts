@@ -13,7 +13,7 @@ const shippingAddressSchema = z.object({
 export const checkoutSchema = z.object({
   shippingAddressId: z.string().optional(),
   shippingAddress: shippingAddressSchema.optional(),
-  paymentMethod: z.enum(['cod', 'bkash', 'nagad', 'card']).optional(),
+  paymentMethod: z.enum(['cod', 'bkash', 'nagad', 'card', 'rocket', 'banking', 'sslcommerz', 'stripe']).optional(),
   couponCode: z.string().optional(),
   prescriptionId: z.string().optional(),
   deliveryCharge: z.number().min(0).optional(),
