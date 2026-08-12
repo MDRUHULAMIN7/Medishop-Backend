@@ -214,10 +214,15 @@ export class OrderService {
       data: { orderId: order.id, orderNumber: order.orderNumber, grandTotal: order.grandTotal },
     });
 
-    // 12. Emit Real-time Socket Event to Admins
+    // 12. Emit Real-time Socket Event to Admins & Owning User
     emitToAdmins('order:created', {
       event: 'order:created',
       message: `New Order ${order.orderNumber} placed for ৳${order.grandTotal}`,
+      order,
+    });
+    emitToUser(userId, 'order:created', {
+      event: 'order:created',
+      message: `Your Order ${order.orderNumber} for ৳${order.grandTotal} has been placed successfully!`,
       order,
     });
 
@@ -288,10 +293,15 @@ export class OrderService {
       },
     });
 
-    // Emit Real-time Socket Event to Admins
+    // Emit Real-time Socket Event to Admins & Owning User
     emitToAdmins('order:status_changed', {
       event: 'order:status_changed',
       message: `Order ${updatedOrder.orderNumber} updated to ${updatedOrder.orderStatus} (${updatedOrder.paymentStatus})`,
+      order: updatedOrder,
+    });
+    emitToUser(updatedOrder.userId, 'order:status_changed', {
+      event: 'order:status_changed',
+      message: `Your Order ${updatedOrder.orderNumber} status is now "${updatedOrder.orderStatus}".`,
       order: updatedOrder,
     });
 
