@@ -6,14 +6,14 @@ import cartRouter from './cart/cart.route';
 import categoryRouter from './category/category.route';
 import couponRouter from './coupon/coupon.route';
 import courierRouter from './courier/courier.route';
+import inventoryRouter from './inventory/inventory.routes';
 import notificationRouter from './notification/notification.route';
 import orderRouter from './order/order.route';
 import posRouter from './pos/pos.route';
+import storeRouter from './pos/store.route';
 import prescriptionRouter from './prescription/prescription.route';
 import productRouter from './product/product.route';
 import userRouter from './user/user.route';
-
-import inventoryRouter from './inventory/inventory.routes';
 
 export const registerModuleRoutes = (app: Application) => {
   app.use('/api/v1/auth', authRouter);
@@ -22,6 +22,7 @@ export const registerModuleRoutes = (app: Application) => {
   app.use('/api/v1/brands', brandRouter);
   app.use('/api/v1/products', productRouter);
   app.use('/api/v1/inventory', inventoryRouter);
+  app.use('/api/v1/stores', storeRouter);
   app.use('/api/v1/cart', cartRouter);
   app.use('/api/v1/coupons', couponRouter);
   app.use('/api/v1/prescriptions', prescriptionRouter);

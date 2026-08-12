@@ -2,7 +2,12 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import app from '../../src/app';
 
-describe('POS Integration Endpoints', () => {
+describe('Shared Inventory & POS Integration Endpoints', () => {
+  it('GET /api/v1/stores should return 401 Unauthorized without auth token', async () => {
+    const res = await request(app).get('/api/v1/stores');
+    expect(res.status).toBe(401);
+  });
+
   it('GET /api/v1/pos/inventory should return 401 Unauthorized without auth token', async () => {
     const res = await request(app).get('/api/v1/pos/inventory');
     expect(res.status).toBe(401);
