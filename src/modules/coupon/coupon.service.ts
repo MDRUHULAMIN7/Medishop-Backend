@@ -124,7 +124,16 @@ export class CouponService {
       throw new ConflictError(`Coupon code "${code}" already exists`, 'COUPON_EXISTS');
     }
 
-    if (new Date(input.startDate) >= new Date(input.endDate)) {
+    const start = new Date(input.startDate);
+    const end = new Date(input.endDate);
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+
+    if (start < todayMidnight) {
+      throw new ValidationError('Start date cannot be in the past');
+    }
+
+    if (start >= end) {
       throw new ValidationError('End date must be after start date');
     }
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const discountTypeEnum = z.enum(['percentage', 'fixed_amount']);
+const discountTypeEnum = z.enum(['percentage', 'fixed', 'fixed_amount']);
 
 export const applyCouponSchema = z.object({
   code: z.string().min(1, 'Coupon code is required'),
