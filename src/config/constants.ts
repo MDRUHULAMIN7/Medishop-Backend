@@ -14,9 +14,13 @@ export const HTTP_STATUS = {
 export const ROLES = {
   CUSTOMER: 'customer',
   PHARMACIST: 'pharmacist',
+  PHARMACIST_VERIFIER: 'pharmacist_verifier',
   SALES_STAFF: 'sales_staff',
   INVENTORY_MANAGER: 'inventory_manager',
+  ORDER_MANAGER: 'order_manager',
+  MARKETING_EDITOR: 'marketing_editor',
   ADMIN: 'admin',
+  SUPER_ADMIN: 'super_admin',
 } as const;
 
 export const OTP_TTL_SECONDS = 300; // 5 minutes

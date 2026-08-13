@@ -13,6 +13,7 @@ import posRouter from './pos/pos.route';
 import storeRouter from './pos/store.route';
 import prescriptionRouter from './prescription/prescription.route';
 import productRouter from './product/product.route';
+import settingsRouter from './settings/settings.route';
 import userRouter from './user/user.route';
 
 export const registerModuleRoutes = (app: Application) => {
@@ -31,4 +32,5 @@ export const registerModuleRoutes = (app: Application) => {
   app.use('/api/v1/pos', posRouter);
   app.use('/api/v1/admin', adminRouter);
   app.use('/api/v1/courier', courierRouter);
+  app.use('/api/v1/settings', settingsRouter);
 };
