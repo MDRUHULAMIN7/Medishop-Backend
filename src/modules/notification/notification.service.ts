@@ -31,6 +31,10 @@ export class NotificationService {
   async markAllNotificationsAsRead(userId: string) {
     return notificationRepository.markAllAsRead(userId);
   }
+
+  async getUnreadCount(userId: string) {
+    return notificationRepository.getUnreadCount(userId);
+  }
 }
 
 export const notificationService = new NotificationService();

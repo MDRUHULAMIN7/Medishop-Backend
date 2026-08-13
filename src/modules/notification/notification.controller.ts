@@ -29,3 +29,8 @@ export const markAllNotificationsAsRead = asyncHandler(async (req: Request, res:
   const result = await notificationService.markAllNotificationsAsRead(req.user!.id);
   return ApiResponse.success(res, 'All notifications marked as read', result);
 });
+
+export const getUnreadCount = asyncHandler(async (req: Request, res: Response) => {
+  const result = await notificationService.getUnreadCount(req.user!.id);
+  return ApiResponse.success(res, 'Unread notification count fetched', result);
+});

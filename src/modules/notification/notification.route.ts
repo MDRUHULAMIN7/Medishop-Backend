@@ -3,6 +3,7 @@ import { authenticate } from '../../middlewares/authenticate';
 import { validateRequest } from '../../middlewares/validateRequest';
 import {
   getMyNotifications,
+  getUnreadCount,
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from './notification.controller';
@@ -39,6 +40,20 @@ router.use(authenticate);
  *         description: Paginated notifications feed and unread count
  */
 router.get('/my', validateRequest({ query: notificationQuerySchema }), getMyNotifications);
+
+/**
+ * @openapi
+ * /notifications/unread-count:
+ *   get:
+ *     summary: Get unread notifications count for logged-in user
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Unread notification count
+ */
+router.get('/unread-count', getUnreadCount);
 
 /**
  * @openapi

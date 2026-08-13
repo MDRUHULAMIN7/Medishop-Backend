@@ -73,6 +73,14 @@ export class NotificationRepository {
     );
     return { success: true };
   }
+
+  async getUnreadCount(userId: string) {
+    const count = await NotificationModel.countDocuments({
+      user: new Types.ObjectId(userId),
+      isRead: false,
+    });
+    return { unreadCount: count };
+  }
 }
 
 export const notificationRepository = new NotificationRepository();
