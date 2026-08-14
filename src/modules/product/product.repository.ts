@@ -140,23 +140,34 @@ export class ProductRepository {
     const filter: FilterQuery<any> = {};
 
     if (!query.includeInactive) {
-      filter.isActive = true;
+      filter.isActive = { $ne: false };
     }
 
     if (query.category) {
-      const catInput = String(query.category).trim();
-      if (isValidObjectId(catInput)) {
-        filter.category = new Types.ObjectId(catInput);
-      } else {
-        const catSlug = catInput.toLowerCase();
-        const cat = await CategoryModel.findOne({
-          $or: [
-            { slug: catSlug },
-            { name: new RegExp(`^${catSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-          ],
-        });
-        if (cat) {
-          filter.category = cat._id;
+      const rawCats = Array.isArray(query.category)
+        ? query.category
+        : String(query.category).split(',').map((s) => s.trim()).filter(Boolean);
+
+      if (rawCats.length > 0) {
+        const catObjectIds: Types.ObjectId[] = [];
+        for (const catInput of rawCats) {
+          if (isValidObjectId(catInput)) {
+            catObjectIds.push(new Types.ObjectId(catInput));
+          } else {
+            const catSlug = catInput.toLowerCase();
+            const cat = await CategoryModel.findOne({
+              $or: [
+                { slug: catSlug },
+                { name: new RegExp(`^${catSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+              ],
+            });
+            if (cat) {
+              catObjectIds.push(cat._id);
+            }
+          }
+        }
+        if (catObjectIds.length > 0) {
+          filter.category = { $in: catObjectIds };
         } else {
           filter.category = new Types.ObjectId();
         }
@@ -164,19 +175,30 @@ export class ProductRepository {
     }
 
     if (query.brand) {
-      const brandInput = String(query.brand).trim();
-      if (isValidObjectId(brandInput)) {
-        filter.brand = new Types.ObjectId(brandInput);
-      } else {
-        const brandSlug = brandInput.toLowerCase();
-        const brandObj = await BrandModel.findOne({
-          $or: [
-            { slug: brandSlug },
-            { name: new RegExp(`^${brandSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-          ],
-        });
-        if (brandObj) {
-          filter.brand = brandObj._id;
+      const rawBrands = Array.isArray(query.brand)
+        ? query.brand
+        : String(query.brand).split(',').map((s) => s.trim()).filter(Boolean);
+
+      if (rawBrands.length > 0) {
+        const brandObjectIds: Types.ObjectId[] = [];
+        for (const brandInput of rawBrands) {
+          if (isValidObjectId(brandInput)) {
+            brandObjectIds.push(new Types.ObjectId(brandInput));
+          } else {
+            const brandSlug = brandInput.toLowerCase();
+            const brandObj = await BrandModel.findOne({
+              $or: [
+                { slug: brandSlug },
+                { name: new RegExp(`^${brandSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+              ],
+            });
+            if (brandObj) {
+              brandObjectIds.push(brandObj._id);
+            }
+          }
+        }
+        if (brandObjectIds.length > 0) {
+          filter.brand = { $in: brandObjectIds };
         } else {
           filter.brand = new Types.ObjectId();
         }

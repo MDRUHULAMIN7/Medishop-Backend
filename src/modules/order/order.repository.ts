@@ -6,16 +6,24 @@ const toResponse = (order: any): OrderResponse => ({
   id: order._id.toString(),
   orderNumber: order.orderNumber,
   userId: order.user ? (typeof order.user === 'object' ? order.user._id.toString() : order.user.toString()) : '',
+  user: order.user && typeof order.user === 'object' ? {
+    id: order.user._id?.toString(),
+    name: order.user.name,
+    email: order.user.email,
+    phone: order.user.phone,
+    role: order.user.role,
+    createdAt: order.user.createdAt,
+  } : undefined,
   items: (order.items || []).map((item: any) => ({
     productId: item.product ? (typeof item.product === 'object' ? item.product._id.toString() : item.product.toString()) : '',
-    name: item.name,
-    slug: item.slug,
-    dosageForm: item.dosageForm,
-    unitType: item.unitType,
-    image: item.image || '',
-    unitPrice: Number(item.unitPrice),
+    name: item.name || item.product?.name || '',
+    slug: item.slug || item.product?.slug || '',
+    dosageForm: item.dosageForm || item.product?.dosageForm || '',
+    unitType: item.unitType || item.product?.unitType || 'pcs',
+    image: item.image || (item.product?.images && item.product?.images[0]) || '',
+    unitPrice: Number(item.unitPrice || item.product?.price || 0),
     discountPrice: item.discountPrice !== undefined ? Number(item.discountPrice) : undefined,
-    effectiveUnitPrice: Number(item.effectiveUnitPrice),
+    effectiveUnitPrice: Number(item.effectiveUnitPrice || item.product?.price || 0),
     quantity: Number(item.quantity),
     totalPrice: Number(item.totalPrice),
     requiresPrescription: Boolean(item.requiresPrescription),
@@ -39,11 +47,18 @@ const toResponse = (order: any): OrderResponse => ({
 export class OrderRepository {
   async create(data: any) {
     const created = await OrderModel.create(data);
-    return toResponse(created.toObject());
+    const populated = await created.populate([
+      { path: 'user', select: 'name email phone role createdAt' },
+      { path: 'items.product', select: 'name slug dosageForm unitType images price' },
+    ]);
+    return toResponse(populated.toObject());
   }
 
   async findById(id: string) {
-    const order = await OrderModel.findById(id).lean();
+    const order = await OrderModel.findById(id)
+      .populate('user', 'name email phone role createdAt')
+      .populate('items.product', 'name slug dosageForm unitType images price')
+      .lean();
     return order ? toResponse(order) : null;
   }
 
@@ -52,12 +67,19 @@ export class OrderRepository {
   }
 
   async findByIdempotencyKey(key: string) {
-    const order = await OrderModel.findOne({ idempotencyKey: key }).lean();
+    const order = await OrderModel.findOne({ idempotencyKey: key })
+      .populate('user', 'name email phone role createdAt')
+      .populate('items.product', 'name slug dosageForm unitType images price')
+      .lean();
     return order ? toResponse(order) : null;
   }
 
   async findByUserId(userId: string) {
-    const orders = await OrderModel.find({ user: new Types.ObjectId(userId) }).sort({ createdAt: -1 }).lean();
+    const orders = await OrderModel.find({ user: new Types.ObjectId(userId) })
+      .populate('user', 'name email phone role createdAt')
+      .populate('items.product', 'name slug dosageForm unitType images price')
+      .sort({ createdAt: -1 })
+      .lean();
     return orders.map(toResponse);
   }
 
@@ -75,7 +97,13 @@ export class OrderRepository {
     }
 
     const [orders, total] = await Promise.all([
-      OrderModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      OrderModel.find(filter)
+        .populate('user', 'name email phone role createdAt')
+        .populate('items.product', 'name slug dosageForm unitType images price')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       OrderModel.countDocuments(filter),
     ]);
 
@@ -99,7 +127,10 @@ export class OrderRepository {
     const updated = await OrderModel.findByIdAndUpdate(id, updatePayload, {
       new: true,
       runValidators: true,
-    }).lean();
+    })
+      .populate('user', 'name email phone role createdAt')
+      .populate('items.product', 'name slug dosageForm unitType images price')
+      .lean();
 
     return updated ? toResponse(updated) : null;
   }

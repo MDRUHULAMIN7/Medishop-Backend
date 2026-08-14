@@ -28,7 +28,22 @@ export class OrderService {
     }
 
     // 1. Fetch Cart & Validate Items
-    const cartResponse = await cartService.getCart(userId);
+    let cartResponse = await cartService.getCart(userId);
+
+    // Auto populate DB cart if empty and input.items passed from frontend
+    if ((!cartResponse || cartResponse.items.length === 0) && input.items && input.items.length > 0) {
+      for (const item of input.items) {
+        if (item.productId && item.quantity > 0) {
+          try {
+            await cartService.addItem(userId, { productId: item.productId, quantity: item.quantity });
+          } catch (e) {
+            console.error('Failed to auto-populate DB cart for item:', item, e);
+          }
+        }
+      }
+      cartResponse = await cartService.getCart(userId);
+    }
+
     if (!cartResponse || cartResponse.items.length === 0) {
       throw new ValidationError('Your cart is empty. Add products before checking out.');
     }
@@ -124,13 +139,20 @@ export class OrderService {
     const mainStore = await posRepository.findMainStore();
 
     for (const cartItem of cartResponse.items) {
+      const targetQty = cartItem.quantity;
+      const targetProdId = cartItem.product.id;
+
+      // Decrement BOTH stock AND stockCached atomically in MongoDB
       const product = await ProductModel.findOneAndUpdate(
         {
-          _id: cartItem.product.id,
+          _id: targetProdId,
           isActive: true,
-          stock: { $gte: cartItem.quantity },
+          $or: [
+            { stockCached: { $gte: targetQty } },
+            { stock: { $gte: targetQty } },
+          ],
         },
-        { $inc: { stock: -cartItem.quantity } },
+        { $inc: { stock: -targetQty, stockCached: -targetQty } },
         { new: true }
       );
 
@@ -140,6 +162,16 @@ export class OrderService {
           400,
           'STOCK_RESERVATION_FAILED'
         );
+      }
+
+      // Sync unitPrices stock array if present
+      if (product.unitPrices && product.unitPrices.length > 0) {
+        product.unitPrices.forEach((up: any) => {
+          if (up.stock !== undefined) {
+            up.stock = Math.max(0, up.stock - targetQty);
+          }
+        });
+        await product.save();
       }
 
       orderItemSnapshots.push({

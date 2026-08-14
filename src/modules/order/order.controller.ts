@@ -3,6 +3,7 @@ import { HTTP_STATUS } from '../../config/constants';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { orderService } from './order.service';
+import { generateInvoice } from '../../utils/invoiceGenerator';
 
 export const checkout = asyncHandler(async (req: Request, res: Response) => {
   const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
@@ -43,4 +44,15 @@ export const updateOrderStatus = asyncHandler(async (req: Request, res: Response
     `Order ${order.orderNumber} status updated to ${order.orderStatus}`,
     order
   );
+});
+
+import { settingsService } from '../settings/settings.service';
+
+export const downloadInvoice = asyncHandler(async (req: Request, res: Response) => {
+  const order = await orderService.getOrderById(req.params.id);
+  const siteSettings = await settingsService.getPublicSettings().catch(() => null);
+  const pdfBuffer = await generateInvoice(order, siteSettings);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=invoice-${order.orderNumber || order.id}.pdf`);
+  return res.status(200).send(pdfBuffer);
 });

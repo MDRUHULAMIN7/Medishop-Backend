@@ -8,7 +8,7 @@ export class CartService {
     const cart = await cartRepository.getOrCreateCart(userId);
     const populatedCart = await cart.populate({
       path: 'items.product',
-      select: 'name slug dosageForm unitType images price discountPrice stock requiresPrescription isActive',
+      select: 'name slug dosageForm unitType images price discountPrice stock stockCached requiresPrescription isActive',
     });
 
     const itemsResponse: CartItemResponse[] = [];
@@ -56,7 +56,7 @@ export class CartService {
       const effectivePrice =
         discountPrice !== undefined && discountPrice < price ? discountPrice : price;
 
-      const stock = Number(product.stock);
+      const stock = Number(product.stockCached !== undefined && product.stockCached !== null ? product.stockCached : product.stock || 0);
       const isStockExceeded = stock < item.quantity;
       const maxAvailableQuantity = stock;
 
@@ -126,13 +126,21 @@ export class CartService {
       throw new ValidationError('Quantity must be at least 1');
     }
 
+    const availableStock = Number(product.stockCached !== undefined && product.stockCached !== null ? product.stockCached : product.stock || 0);
     const cart = await cartRepository.getOrCreateCart(userId);
     const existingItem = cart.items.find(
       (item: any) => item.product.toString() === input.productId
     );
 
+    const currentQty = existingItem ? existingItem.quantity : 0;
+    const requestedTotalQty = currentQty + input.quantity;
+
+    if (requestedTotalQty > availableStock) {
+      throw new ValidationError(`পর্যাপ্ত স্টক নেই (সর্বোচ্চ উপলব্ধ: ${availableStock} টি)`);
+    }
+
     if (existingItem) {
-      existingItem.quantity += input.quantity;
+      existingItem.quantity = requestedTotalQty;
     } else {
       cart.items.push({
         product: product._id,
@@ -148,6 +156,14 @@ export class CartService {
   async updateItem(userId: string, productId: string, input: UpdateCartItemInput): Promise<CartResponse> {
     if (input.quantity <= 0) {
       return this.removeItem(userId, productId);
+    }
+
+    const product = await productRepository.findRawById(productId);
+    if (product) {
+      const availableStock = Number(product.stockCached !== undefined && product.stockCached !== null ? product.stockCached : product.stock || 0);
+      if (input.quantity > availableStock) {
+        throw new ValidationError(`পর্যাপ্ত স্টক নেই (সর্বোচ্চ উপলব্ধ: ${availableStock} টি)`);
+      }
     }
 
     const cart = await cartRepository.getOrCreateCart(userId);
@@ -172,9 +188,8 @@ export class CartService {
     return this.getCart(userId);
   }
 
-  async clearCart(userId: string): Promise<CartResponse> {
+  async clearCart(userId: string): Promise<void> {
     await cartRepository.clearCart(userId);
-    return this.getCart(userId);
   }
 }
 

@@ -9,8 +9,10 @@ const CACHE_TTL_SECONDS = 86400; // 24 Hours TTL
 const toPublicSettings = (doc: SiteSettingsDocumentData): PublicSiteSettings => ({
   general: doc.general,
   branding: doc.branding,
+  payment: doc.payment,
   shipping: doc.shipping,
   seo: doc.seo,
+  legal: doc.legal,
   maintenanceMode: doc.maintenanceMode,
   updatedAt: doc.updatedAt,
 });

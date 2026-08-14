@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../middlewares/authenticate';
 import { authorize } from '../../middlewares/authorize';
 import { validateRequest } from '../../middlewares/validateRequest';
-import { checkout, getAllOrders, getMyOrders, getOrderById, updateOrderStatus } from './order.controller';
+import { checkout, getAllOrders, getMyOrders, getOrderById, updateOrderStatus, downloadInvoice } from './order.controller';
 import { checkoutSchema, orderIdSchema, orderQuerySchema, updateOrderStatusSchema } from './order.validation';
 
 const router = Router();
@@ -127,6 +127,8 @@ router.get(
  *       200:
  *         description: Order details
  */
+router.get('/:id/invoice/download', validateRequest({ params: orderIdSchema }), downloadInvoice);
+
 router.get('/:id', validateRequest({ params: orderIdSchema }), getOrderById);
 
 /**

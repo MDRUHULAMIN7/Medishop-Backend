@@ -1,6 +1,97 @@
 import { Schema, model } from 'mongoose';
 import { SiteSettingsDocumentData } from './settings.types';
 
+const defaultPaymentMethods = [
+  {
+    id: 'pay_cod',
+    code: 'cod',
+    nameBn: 'ক্যাশ অন ডেলিভারি (পণ্য বুঝে টাকা দিন)',
+    nameEn: 'Cash on Delivery (Pay when received)',
+    descriptionBn: 'পণ্য হাতে পাওয়ার পর মূল্য পরিশোধ করুন',
+    descriptionEn: 'Pay with cash upon delivery of your items',
+    isActive: true,
+    isDefault: true,
+  },
+  {
+    id: 'pay_bkash',
+    code: 'bkash',
+    nameBn: 'বিকাশ (bKash Instant)',
+    nameEn: 'bKash Instant Payment',
+    descriptionBn: 'বিকাশ মার্চেন্ট একাউন্টে সেন্ড মানি/মেক পেমেন্ট করুন',
+    descriptionEn: 'Fast & secure bKash payment',
+    accountNumber: '01712345678 (Merchant)',
+    instructionsBn: 'বিকাশ এপে মেক পেমেন্ট করুন ০১৭১২৩৪NTX',
+    instructionsEn: 'Make payment to 01712345678',
+    isActive: true,
+    isDefault: false,
+  },
+  {
+    id: 'pay_nagad',
+    code: 'nagad',
+    nameBn: 'নগদ (Nagad Payment)',
+    nameEn: 'Nagad Instant Payment',
+    descriptionBn: 'নগদ একাউন্ট থেকে পেমেন্ট করুন',
+    descriptionEn: 'Secure Nagad wallet payment',
+    accountNumber: '01712345678 (Merchant)',
+    instructionsBn: 'নগদ মার্চেন্ট নম্বরে পেমেন্ট সম্পন্ন করুন',
+    instructionsEn: 'Make payment to Nagad Merchant number',
+    isActive: true,
+    isDefault: false,
+  },
+  {
+    id: 'pay_card',
+    code: 'card',
+    nameBn: 'কার্ড / ইন্টারনেট ব্যাংকিং (SSLCommerz)',
+    nameEn: 'Visa / Mastercard / Internet Banking',
+    descriptionBn: 'যে কোনো ব্যাংকের কার্ড দিয়ে তাতক্ষণিক পেমেন্ট করুন',
+    descriptionEn: 'Pay via Debit/Credit Cards or Net Banking',
+    isActive: true,
+    isDefault: false,
+  },
+];
+
+const defaultDeliveryOptions = [
+  {
+    id: 'del_dhaka',
+    code: 'inside_dhaka',
+    nameBn: 'ঢাকার ভিতরে ডেলিভারি',
+    nameEn: 'Inside Dhaka City',
+    charge: 60,
+    estimatedDaysBn: '২৪ - ৪৮ ঘণ্টা',
+    estimatedDaysEn: '24 - 48 Hours',
+    descriptionBn: 'ঢাকার যে কোনো স্থানে হোম ডেলিভারি',
+    descriptionEn: 'Home delivery inside Dhaka Metropolitan area',
+    isActive: true,
+    isDefault: true,
+  },
+  {
+    id: 'del_outside',
+    code: 'outside_dhaka',
+    nameBn: 'ঢাকার বাইরে কুরিয়ার ডেলিভারি',
+    nameEn: 'Outside Dhaka (All BD)',
+    charge: 120,
+    estimatedDaysBn: '২ - ৩ কার্যদিবস',
+    estimatedDaysEn: '2 - 3 Working Days',
+    descriptionBn: 'সুন্দরিবন/এসএ পরিবহন/রেডেক্স কুরিয়ার সার্ভিস',
+    descriptionEn: 'Courier home delivery across Bangladesh',
+    isActive: true,
+    isDefault: false,
+  },
+  {
+    id: 'del_express',
+    code: 'express',
+    nameBn: 'জরুরী এক্সপ্রেস ডেলিভারি (২-৬ ঘণ্টা)',
+    nameEn: 'Urgent Express Delivery (Dhaka Only)',
+    charge: 150,
+    estimatedDaysBn: '২ - ৬ ঘণ্টা',
+    estimatedDaysEn: '2 - 6 Hours',
+    descriptionBn: 'ঢাকার মধ্যে জরুরি প্রয়োজনে দ্রততম প্যাথাও/রাইডার হ্যান্ডওভার',
+    descriptionEn: 'Instant express courier delivery inside Dhaka',
+    isActive: true,
+    isDefault: false,
+  },
+];
+
 const siteSettingsSchema = new Schema<SiteSettingsDocumentData>(
   {
     general: {
@@ -23,12 +114,49 @@ const siteSettingsSchema = new Schema<SiteSettingsDocumentData>(
       codEnabled: { type: Boolean, default: true },
       minOrderForCod: { type: Number, default: 0 },
       enabledGateways: { type: [String], default: ['cod', 'bkash', 'nagad', 'card'] },
+      methods: {
+        type: [
+          {
+            id: String,
+            code: String,
+            nameBn: String,
+            nameEn: String,
+            descriptionBn: String,
+            descriptionEn: String,
+            accountNumber: String,
+            instructionsBn: String,
+            instructionsEn: String,
+            icon: String,
+            isActive: Boolean,
+            isDefault: Boolean,
+          },
+        ],
+        default: defaultPaymentMethods,
+      },
     },
     shipping: {
       freeShippingThreshold: { type: Number, default: 1000 },
       defaultDeliveryChargeInsideDhaka: { type: Number, default: 60 },
       defaultDeliveryChargeOutsideDhaka: { type: Number, default: 120 },
       estimatedDeliveryDays: { type: String, default: '2 - 4 working days' },
+      options: {
+        type: [
+          {
+            id: String,
+            code: String,
+            nameBn: String,
+            nameEn: String,
+            charge: Number,
+            estimatedDaysBn: String,
+            estimatedDaysEn: String,
+            descriptionBn: String,
+            descriptionEn: String,
+            isActive: Boolean,
+            isDefault: Boolean,
+          },
+        ],
+        default: defaultDeliveryOptions,
+      },
     },
     seo: {
       defaultMetaTitle: { type: String, default: 'mediShop — Online Pharmacy BD' },
@@ -51,7 +179,15 @@ const siteSettingsSchema = new Schema<SiteSettingsDocumentData>(
       },
       refundPolicyContent: {
         type: String,
-        default: 'Returns are accepted within 7 days for unopened sealed packages.',
+        default: 'Returns accepted within 7 days with original seal & invoice receipt.',
+      },
+      invoiceTerms: {
+        type: String,
+        default: 'Goods once sold are non-refundable unless damaged or incorrect. DGDA verified items.',
+      },
+      warrantyPolicyContent: {
+        type: String,
+        default: 'Manufacturer warranty applies where applicable with official invoice.',
       },
     },
     maintenanceMode: { type: Boolean, default: false },

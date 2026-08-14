@@ -60,6 +60,7 @@ export interface IOrder {
 }
 
 export interface CheckoutInput {
+  items?: Array<{ productId: string; quantity: number }>;
   shippingAddressId?: string;
   shippingAddress?: IOrderShippingAddress;
   paymentMethod?: PaymentMethod;

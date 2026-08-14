@@ -1,5 +1,34 @@
 import { Types } from 'mongoose';
 
+export interface DynamicPaymentMethod {
+  id: string;
+  code: string;
+  nameBn: string;
+  nameEn: string;
+  descriptionBn?: string;
+  descriptionEn?: string;
+  accountNumber?: string;
+  instructionsBn?: string;
+  instructionsEn?: string;
+  icon?: string;
+  isActive: boolean;
+  isDefault?: boolean;
+}
+
+export interface DynamicDeliveryOption {
+  id: string;
+  code: string;
+  nameBn: string;
+  nameEn: string;
+  charge: number;
+  estimatedDaysBn: string;
+  estimatedDaysEn: string;
+  descriptionBn?: string;
+  descriptionEn?: string;
+  isActive: boolean;
+  isDefault?: boolean;
+}
+
 export interface GeneralSettings {
   siteName: string;
   tagline?: string;
@@ -22,6 +51,7 @@ export interface PaymentSettings {
   codEnabled: boolean;
   minOrderForCod?: number;
   enabledGateways: string[]; // e.g. ['cod', 'bkash', 'nagad', 'card']
+  methods: DynamicPaymentMethod[];
 }
 
 export interface ShippingSettings {
@@ -29,6 +59,7 @@ export interface ShippingSettings {
   defaultDeliveryChargeInsideDhaka: number;
   defaultDeliveryChargeOutsideDhaka: number;
   estimatedDeliveryDays: string;
+  options: DynamicDeliveryOption[];
 }
 
 export interface SEOSettings {
@@ -43,6 +74,8 @@ export interface LegalSettings {
   termsContent: string;
   privacyContent: string;
   refundPolicyContent: string;
+  invoiceTerms?: string;
+  warrantyPolicyContent?: string;
 }
 
 export interface SiteSettingsDocumentData {
@@ -61,8 +94,10 @@ export interface SiteSettingsDocumentData {
 export interface PublicSiteSettings {
   general: GeneralSettings;
   branding: BrandingSettings;
+  payment: PaymentSettings;
   shipping: ShippingSettings;
   seo: SEOSettings;
+  legal?: LegalSettings;
   maintenanceMode: boolean;
   updatedAt?: Date;
 }
