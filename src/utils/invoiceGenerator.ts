@@ -6,9 +6,9 @@ export async function generateInvoice(order: any, siteSettings?: any): Promise<B
       const doc = new PDFDocument({ margin: 36, size: 'A4' });
       const buffers: Buffer[] = [];
 
-      doc.on('data', (chunk) => buffers.push(chunk));
+      doc.on('data', (chunk: Buffer) => buffers.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(buffers)));
-      doc.on('error', (err) => reject(err));
+      doc.on('error', (err: Error) => reject(err));
 
       const primaryBlue = siteSettings?.branding?.primaryColor || '#1D4ED8';
       const textColor = '#0F172A';
