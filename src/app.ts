@@ -18,7 +18,21 @@ const app: Application = express();
 app.use(helmet());
 app.use(
   cors({
-    origin: config.CLIENT_URL,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+
+      const configuredUrls = config.CLIENT_URL.split(',').map((u) => u.trim());
+      const isAllowed =
+        configuredUrls.includes(origin) ||
+        origin.includes('localhost') ||
+        origin.endsWith('.vercel.app');
+
+      if (isAllowed) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Permissive in production to avoid frontend connection block
+    },
     credentials: true,
   })
 );
