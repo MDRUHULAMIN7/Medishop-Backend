@@ -19,6 +19,7 @@ export interface IUnitPriceOption {
   unit: UnitType;
   unitLabelBn?: string;
   unitLabelEn?: string;
+  buyingPrice?: number;
   price: number;
   mrp?: number;
   discountPrice?: number;
@@ -30,6 +31,7 @@ export interface IUnitPriceOption {
 export interface IPackagingUnit {
   unit: UnitType;
   baseUnitQty: number; // how many baseUnits in 1 unit (box=100, strip=10, pcs=1)
+  buyingPrice?: number;
   price: number;
   mrp?: number;
   discountPrice?: number;
@@ -67,6 +69,7 @@ export interface IProduct {
   isActive: boolean;
   ratingAverage: number;
   ratingCount: number;
+  buyingPrice?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -111,6 +114,7 @@ export interface ProductResponse {
   isActive: boolean;
   ratingAverage: number;
   ratingCount: number;
+  buyingPrice?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -133,6 +137,7 @@ export interface CreateProductInput {
   category: string;
   brand: string;
   price: number;
+  buyingPrice?: number;
   discountPrice?: number;
   stock?: number;
   expiryDate?: string | Date | null;
@@ -161,6 +166,7 @@ export interface UpdateProductInput {
   category?: string;
   brand?: string;
   price?: number;
+  buyingPrice?: number;
   discountPrice?: number;
   stock?: number;
   expiryDate?: string | Date | null;

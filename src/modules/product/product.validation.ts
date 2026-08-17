@@ -29,6 +29,7 @@ const unitTypeEnum = z.enum([
 const packagingTierSchema = z.object({
   unit: unitTypeEnum,
   baseUnitQty: z.union([z.number().min(1), z.string().transform((v) => Number(v))]).optional().default(1),
+  buyingPrice: z.union([z.number().min(0), z.string().transform((v) => (v ? Number(v) : 0))]).optional().default(0),
   price: z.union([z.number().min(0), z.string().transform((v) => Number(v))]),
   mrp: z.union([z.number().min(0), z.string().transform((v) => Number(v))]).optional(),
   discountPrice: z.union([z.number().min(0), z.string().transform((v) => (v ? Number(v) : undefined))]).optional(),
@@ -43,6 +44,7 @@ const unitPriceTierSchema = z.object({
   baseUnitQty: z.union([z.number().min(1), z.string().transform((v) => Number(v))]).optional().default(1),
   unitLabelBn: z.string().optional(),
   unitLabelEn: z.string().optional(),
+  buyingPrice: z.union([z.number().min(0), z.string().transform((v) => (v ? Number(v) : 0))]).optional().default(0),
   price: z.union([z.number().min(0), z.string().transform((v) => Number(v))]),
   mrp: z.union([z.number().min(0), z.string().transform((v) => Number(v))]).optional(),
   discountPrice: z.union([z.number().min(0), z.string().transform((v) => (v ? Number(v) : undefined))]).optional(),
@@ -66,6 +68,7 @@ export const createProductSchema = z.object({
   tags: z.union([z.array(z.string()), z.string()]).optional(),
   category: z.string().min(1, 'Category ID is required'),
   brand: z.string().min(1, 'Brand ID is required'),
+  buyingPrice: z.union([z.number().min(0), z.string().transform((val) => (val ? Number(val) : 0))]).optional().default(0),
   price: z.union([z.number().min(0), z.string().transform((val) => Number(val))]),
   discountPrice: z
     .union([z.number().min(0), z.string().transform((val) => (val ? Number(val) : undefined))])
@@ -94,6 +97,7 @@ export const updateProductSchema = z.object({
   tags: z.union([z.array(z.string()), z.string()]).optional(),
   category: z.string().optional(),
   brand: z.string().optional(),
+  buyingPrice: z.union([z.number().min(0), z.string().transform((val) => (val ? Number(val) : 0))]).optional(),
   price: z.union([z.number().min(0), z.string().transform((val) => Number(val))]).optional(),
   discountPrice: z
     .union([z.number().min(0), z.string().transform((val) => (val ? Number(val) : undefined))])

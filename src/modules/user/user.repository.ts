@@ -86,14 +86,52 @@ export class UserRepository {
     return UserModel.findByIdAndUpdate(userId, { status }, { new: true });
   }
 
+  async findByEmail(email: string, includePassword = false) {
+    const cleaned = email.trim().toLowerCase();
+    return this.findOne({ email: cleaned }, includePassword);
+  }
+
+  async findByPhone(phone: string, includePassword = false) {
+    const cleaned = phone.trim().replace(/[\s-]/g, '');
+    const normalized = cleaned.startsWith('01') ? `+88${cleaned}` : cleaned.startsWith('880') ? `+${cleaned}` : cleaned;
+    const raw = normalized.replace(/^\+88/, '').replace(/^\+/, '');
+
+    return UserModel.findOne({
+      $or: [
+        { phone: normalized },
+        { phone: raw },
+        { phone: `+88${raw}` },
+        { phone: `88${raw}` },
+        { phone: `0${raw.replace(/^0/, '')}` },
+      ],
+    }).select(includePassword ? '+password' : '');
+  }
+
   async findByIdentifier(identifier: string, includePassword = false) {
-    const filter = identifier.includes('@') ? { email: identifier } : { phone: identifier };
-    return this.findOne(filter, includePassword);
+    const trimmed = identifier.trim();
+    if (trimmed.includes('@')) {
+      return this.findByEmail(trimmed, includePassword);
+    }
+    return this.findByPhone(trimmed, includePassword);
   }
 
   async existsByIdentifier(identifier: string) {
-    const filter = identifier.includes('@') ? { email: identifier } : { phone: identifier };
-    return UserModel.exists(filter);
+    const trimmed = identifier.trim();
+    if (trimmed.includes('@')) {
+      return UserModel.exists({ email: trimmed.toLowerCase() });
+    }
+    const cleaned = trimmed.replace(/[\s-]/g, '');
+    const normalized = cleaned.startsWith('01') ? `+88${cleaned}` : cleaned.startsWith('880') ? `+${cleaned}` : cleaned;
+    const raw = normalized.replace(/^\+88/, '').replace(/^\+/, '');
+
+    return UserModel.exists({
+      $or: [
+        { phone: normalized },
+        { phone: raw },
+        { phone: `+88${raw}` },
+        { phone: `0${raw.replace(/^0/, '')}` },
+      ],
+    });
   }
 
   async findAll(filter: FilterQuery<UserDocumentData> = {}, page = 1, limit = 20) {

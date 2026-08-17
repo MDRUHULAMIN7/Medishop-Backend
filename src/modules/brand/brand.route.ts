@@ -107,7 +107,7 @@ router.get('/:idOrSlug', validateRequest({ params: brandIdOrSlugSchema }), getBr
 router.post(
   '/',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist'),
   validateRequest({ body: createBrandSchema }),
   createBrand
 );
@@ -133,7 +133,7 @@ router.post(
 router.patch(
   '/:id',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist'),
   validateRequest({ params: brandIdSchema, body: updateBrandSchema }),
   updateBrand
 );
@@ -159,7 +159,7 @@ router.patch(
 router.patch(
   '/:id/toggle-feature',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist'),
   validateRequest({ params: brandIdSchema }),
   toggleFeaturedBrand
 );
@@ -185,7 +185,7 @@ router.patch(
 router.delete(
   '/:id',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist'),
   validateRequest({ params: brandIdSchema }),
   deleteBrand
 );

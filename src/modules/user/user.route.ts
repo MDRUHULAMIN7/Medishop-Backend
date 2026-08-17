@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/authenticate';
 import { authorize } from '../../middlewares/authorize';
+import { upload } from '../../middlewares/upload';
 import { validateRequest } from '../../middlewares/validateRequest';
 import {
   addAddress,
@@ -13,6 +14,7 @@ import {
   updateAddress,
   updateMe,
   updateUserStatus,
+  uploadAvatar,
 } from './user.controller';
 import {
   addressIdParamsSchema,
@@ -70,6 +72,22 @@ router.get('/me', authenticate, getMe);
  *         description: Profile updated successfully
  */
 router.patch('/me', authenticate, validateRequest({ body: updateProfileSchema }), updateMe);
+
+/**
+ * @openapi
+ * /users/me/avatar:
+ *   patch:
+ *     summary: Upload avatar with Sharp optimization (Convert to WebP & resize)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     consumes:
+ *       - multipart/form-data
+ *     responses:
+ *       200:
+ *         description: Avatar updated successfully
+ */
+router.patch('/me/avatar', authenticate, upload.single('avatar'), uploadAvatar);
 
 /**
  * @openapi

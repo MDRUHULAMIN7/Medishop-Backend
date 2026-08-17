@@ -46,6 +46,10 @@ export class ProductService {
     return result;
   }
 
+  async getAdminProducts(query: ProductFilterQuery) {
+    return productRepository.findAdminProducts(query);
+  }
+
   async getSearchSuggestions(queryText: string, limit = 8): Promise<SearchSuggestionItem[]> {
     const trimmed = queryText.trim().toLowerCase();
     if (!trimmed) {
@@ -88,6 +92,14 @@ export class ProductService {
     }
 
     await setRedisCache(cacheKey, product, CACHE_TTL_SECONDS);
+    return product;
+  }
+
+  async getAdminProductByIdOrSlug(idOrSlug: string) {
+    const product = await productRepository.findAdminByIdOrSlug(idOrSlug);
+    if (!product) {
+      throw new NotFoundError('Product not found', 'PRODUCT_NOT_FOUND');
+    }
     return product;
   }
 
@@ -170,7 +182,7 @@ export class ProductService {
   }
 
   async updateProduct(id: string, input: UpdateProductInput) {
-    const existing = await productRepository.findRawById(id);
+    const existing: any = await productRepository.findRawById(id);
     if (!existing) {
       throw new NotFoundError('Product not found', 'PRODUCT_NOT_FOUND');
     }
@@ -193,7 +205,7 @@ export class ProductService {
 
     let slug = input.slug ? slugify(input.slug) : undefined;
     if (slug && slug !== existing.slug) {
-      const duplicateSlug = await productRepository.findRawBySlug(slug);
+      const duplicateSlug: any = await productRepository.findRawBySlug(slug);
       if (duplicateSlug && duplicateSlug._id.toString() !== id) {
         throw new ConflictError(`Product with slug "${slug}" already exists`, 'SLUG_EXISTS');
       }
@@ -213,7 +225,7 @@ export class ProductService {
   }
 
   async toggleFeatured(id: string) {
-    const product = await productRepository.findRawById(id);
+    const product: any = await productRepository.findRawById(id);
     if (!product) {
       throw new NotFoundError('Product not found', 'PRODUCT_NOT_FOUND');
     }
@@ -227,7 +239,7 @@ export class ProductService {
   }
 
   async deleteProduct(id: string) {
-    const product = await productRepository.findRawById(id);
+    const product: any = await productRepository.findRawById(id);
     if (!product) {
       throw new NotFoundError('Product not found', 'PRODUCT_NOT_FOUND');
     }

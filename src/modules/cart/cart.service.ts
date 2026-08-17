@@ -117,7 +117,7 @@ export class CartService {
   }
 
   async addItem(userId: string, input: AddCartItemInput): Promise<CartResponse> {
-    const product = await productRepository.findRawById(input.productId);
+    const product: any = await productRepository.findRawById(input.productId);
     if (!product || !product.isActive) {
       throw new NotFoundError('Product not found or unavailable', 'PRODUCT_NOT_FOUND');
     }
@@ -135,7 +135,7 @@ export class CartService {
     const currentQty = existingItem ? existingItem.quantity : 0;
     const requestedTotalQty = currentQty + input.quantity;
 
-    if (requestedTotalQty > availableStock) {
+    if (requestedTotalQty > availableStock && !input.allowPreOrder) {
       throw new ValidationError(`পর্যাপ্ত স্টক নেই (সর্বোচ্চ উপলব্ধ: ${availableStock} টি)`);
     }
 
@@ -158,7 +158,7 @@ export class CartService {
       return this.removeItem(userId, productId);
     }
 
-    const product = await productRepository.findRawById(productId);
+    const product: any = await productRepository.findRawById(productId);
     if (product) {
       const availableStock = Number(product.stockCached !== undefined && product.stockCached !== null ? product.stockCached : product.stock || 0);
       if (input.quantity > availableStock) {

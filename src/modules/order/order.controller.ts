@@ -7,11 +7,14 @@ import { generateInvoice } from '../../utils/invoiceGenerator';
 
 export const checkout = asyncHandler(async (req: Request, res: Response) => {
   const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
-  const order = await orderService.processCheckout(req.user!.id, req.body, idempotencyKey);
+  const result = await orderService.processCheckout(req.user!.id, req.body, idempotencyKey);
+  const orders = Array.isArray((result as any).orders) ? (result as any).orders : [result];
   return ApiResponse.success(
     res,
-    `Order ${order.orderNumber} placed successfully!`,
-    order,
+    orders.length > 1
+      ? `${orders.length} orders placed successfully!`
+      : `Order ${orders[0].orderNumber} placed successfully!`,
+    result,
     HTTP_STATUS.CREATED
   );
 });

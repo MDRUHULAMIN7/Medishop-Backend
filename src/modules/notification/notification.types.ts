@@ -6,6 +6,7 @@ export type NotificationType =
   | 'prescription_submitted'
   | 'prescription_approved'
   | 'prescription_rejected'
+  | 'live_chat_message'
   | 'system_announcement';
 
 export interface INotification {

@@ -1,13 +1,23 @@
 import { Request, Response } from 'express';
 import { HTTP_STATUS } from '../../config/constants';
 import { uploadToCloudinary } from '../../middlewares/upload';
+import { ImageProcessor } from '../../utils/imageProcessor';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { productService } from './product.service';
 
 export const getProducts = asyncHandler(async (req: Request, res: Response) => {
-  const result = await productService.getProducts(req.query as any);
-  return ApiResponse.success(res, 'Products fetched successfully', result.products, HTTP_STATUS.OK, result.meta);
+  const isAdminQuery = req.query.isAdmin === 'true' || (req as any).user?.role === 'admin';
+  const result = isAdminQuery
+    ? await productService.getAdminProducts(req.query as any)
+    : await productService.getProducts(req.query as any);
+  const metaObj = result.meta || {
+    total: result.total,
+    page: result.page,
+    limit: result.limit,
+    totalPages: result.totalPages,
+  };
+  return ApiResponse.success(res, 'Products fetched successfully', result.products, HTTP_STATUS.OK, metaObj);
 });
 
 export const getSearchSuggestions = asyncHandler(async (req: Request, res: Response) => {
@@ -24,7 +34,10 @@ export const getFeaturedProducts = asyncHandler(async (req: Request, res: Respon
 });
 
 export const getProductByIdOrSlug = asyncHandler(async (req: Request, res: Response) => {
-  const product = await productService.getProductByIdOrSlug(req.params.idOrSlug);
+  const isAdminQuery = req.query.isAdmin === 'true' || (req as any).user?.role === 'admin';
+  const product = isAdminQuery
+    ? await productService.getAdminProductByIdOrSlug(req.params.idOrSlug)
+    : await productService.getProductByIdOrSlug(req.params.idOrSlug);
   return ApiResponse.success(res, 'Product details fetched successfully', product);
 });
 
@@ -33,7 +46,10 @@ export const createProduct = asyncHandler(async (req: Request, res: Response) =>
   let imageUrls: string[] = req.body.images || [];
 
   if (files && files.length > 0) {
-    const uploadPromises = files.map((file) => uploadToCloudinary(file.buffer, 'medishop/products'));
+    const uploadPromises = files.map(async (file) => {
+      const processed = await ImageProcessor.processProductImage(file.buffer, true);
+      return uploadToCloudinary(processed.mainBuffer, 'medishop/products', 'webp');
+    });
     const uploadedUrls = await Promise.all(uploadPromises);
     imageUrls = [...imageUrls, ...uploadedUrls];
   }
@@ -63,6 +79,7 @@ export const createProduct = asyncHandler(async (req: Request, res: Response) =>
     images: imageUrls,
     ...(unitPrices && { unitPrices }),
     ...(packaging && { packaging }),
+    buyingPrice: req.body.buyingPrice !== undefined ? Number(req.body.buyingPrice) : 0,
     price: Number(req.body.price),
     discountPrice: req.body.discountPrice ? Number(req.body.discountPrice) : undefined,
     stock: Number(req.body.stock),
@@ -80,7 +97,10 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response) =>
   let imageUrls: string[] | undefined = req.body.images;
 
   if (files && files.length > 0) {
-    const uploadPromises = files.map((file) => uploadToCloudinary(file.buffer, 'medishop/products'));
+    const uploadPromises = files.map(async (file) => {
+      const processed = await ImageProcessor.processProductImage(file.buffer, true);
+      return uploadToCloudinary(processed.mainBuffer, 'medishop/products', 'webp');
+    });
     const uploadedUrls = await Promise.all(uploadPromises);
     imageUrls = [...(imageUrls || []), ...uploadedUrls];
   }
@@ -110,6 +130,7 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response) =>
     ...(imageUrls !== undefined && { images: imageUrls }),
     ...(unitPrices !== undefined && { unitPrices }),
     ...(packaging !== undefined && { packaging }),
+    ...(req.body.buyingPrice !== undefined && { buyingPrice: Number(req.body.buyingPrice) }),
     ...(req.body.price !== undefined && { price: Number(req.body.price) }),
     ...(req.body.discountPrice !== undefined && {
       discountPrice: req.body.discountPrice ? Number(req.body.discountPrice) : undefined,

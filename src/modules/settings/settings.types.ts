@@ -29,6 +29,22 @@ export interface DynamicDeliveryOption {
   isDefault?: boolean;
 }
 
+export interface BannerSlide {
+  id: string;
+  titleBn: string;
+  titleEn: string;
+  subtitleBn: string;
+  subtitleEn: string;
+  badgeBn?: string;
+  badgeEn?: string;
+  ctaTextBn: string;
+  ctaTextEn: string;
+  ctaLink: string;
+  isActive: boolean;
+  priority: number;
+  image?: string;
+}
+
 export interface GeneralSettings {
   siteName: string;
   tagline?: string;
@@ -81,6 +97,7 @@ export interface LegalSettings {
 export interface SiteSettingsDocumentData {
   general: GeneralSettings;
   branding: BrandingSettings;
+  banners: BannerSlide[];
   payment: PaymentSettings;
   shipping: ShippingSettings;
   seo: SEOSettings;
@@ -94,6 +111,7 @@ export interface SiteSettingsDocumentData {
 export interface PublicSiteSettings {
   general: GeneralSettings;
   branding: BrandingSettings;
+  banners?: BannerSlide[];
   payment: PaymentSettings;
   shipping: ShippingSettings;
   seo: SEOSettings;
@@ -105,6 +123,7 @@ export interface PublicSiteSettings {
 export interface UpdateSiteSettingsInput {
   general?: Partial<GeneralSettings>;
   branding?: Partial<BrandingSettings>;
+  banners?: BannerSlide[];
   payment?: Partial<PaymentSettings>;
   shipping?: Partial<ShippingSettings>;
   seo?: Partial<SEOSettings>;

@@ -56,6 +56,7 @@ export interface CartResponse {
 export interface AddCartItemInput {
   productId: string;
   quantity: number;
+  allowPreOrder?: boolean;
 }
 
 export interface UpdateCartItemInput {

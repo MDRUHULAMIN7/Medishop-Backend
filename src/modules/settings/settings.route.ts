@@ -29,7 +29,7 @@ router.get('/public', getPublicSettings);
  *       200:
  *         description: Full site settings
  */
-router.get('/', authenticate, authorize('admin', 'super_admin'), getFullSettings);
+router.get('/', authenticate, authorize('admin', 'super_admin', 'marketing_editor'), getFullSettings);
 
 /**
  * @openapi
@@ -43,6 +43,6 @@ router.get('/', authenticate, authorize('admin', 'super_admin'), getFullSettings
  *       200:
  *         description: Updated site settings
  */
-router.put('/', authenticate, authorize('admin', 'super_admin'), updateSettings);
+router.put('/', authenticate, authorize('admin', 'super_admin', 'marketing_editor'), updateSettings);
 
 export default router;

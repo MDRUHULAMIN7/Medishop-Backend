@@ -79,7 +79,7 @@ router.get('/valid', getValidPublicCoupons);
  *       200:
  *         description: All coupons retrieved
  */
-router.get('/', authenticate, authorize('admin'), getAllCoupons);
+router.get('/', authenticate, authorize('admin', 'super_admin', 'marketing_editor'), getAllCoupons);
 
 /**
  * @openapi
@@ -101,7 +101,7 @@ router.get('/', authenticate, authorize('admin'), getAllCoupons);
  *       404:
  *         description: Coupon not found
  */
-router.get('/:id', authenticate, authorize('admin'), validateRequest({ params: couponIdSchema }), getCouponById);
+router.get('/:id', authenticate, authorize('admin', 'super_admin', 'marketing_editor'), validateRequest({ params: couponIdSchema }), getCouponById);
 
 /**
  * @openapi
@@ -151,7 +151,7 @@ router.get('/:id', authenticate, authorize('admin'), validateRequest({ params: c
 router.post(
   '/',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin', 'marketing_editor'),
   validateRequest({ body: createCouponSchema }),
   createCoupon
 );
@@ -177,7 +177,7 @@ router.post(
 router.patch(
   '/:id',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin', 'marketing_editor'),
   validateRequest({ params: couponIdSchema, body: updateCouponSchema }),
   updateCoupon
 );
@@ -203,7 +203,7 @@ router.patch(
 router.delete(
   '/:id',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin', 'marketing_editor'),
   validateRequest({ params: couponIdSchema }),
   deleteCoupon
 );

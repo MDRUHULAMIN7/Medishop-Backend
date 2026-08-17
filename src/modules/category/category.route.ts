@@ -122,7 +122,7 @@ router.get('/:idOrSlug', validateRequest({ params: idOrSlugSchema }), getCategor
 router.post(
   '/',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist'),
   validateRequest({ body: createCategorySchema }),
   createCategory
 );
@@ -148,7 +148,7 @@ router.post(
 router.patch(
   '/:id',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist'),
   validateRequest({ params: categoryIdSchema, body: updateCategorySchema }),
   updateCategory
 );
@@ -174,7 +174,7 @@ router.patch(
 router.patch(
   '/:id/toggle-feature',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist'),
   validateRequest({ params: categoryIdSchema }),
   toggleFeaturedCategory
 );
@@ -200,7 +200,7 @@ router.patch(
 router.delete(
   '/:id',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist'),
   validateRequest({ params: categoryIdSchema }),
   deleteCategory
 );

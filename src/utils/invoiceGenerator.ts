@@ -10,10 +10,15 @@ export async function generateInvoice(order: any, siteSettings?: any): Promise<B
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', (err) => reject(err));
 
-      const primaryBlue = '#1D4ED8';
+      const primaryBlue = siteSettings?.branding?.primaryColor || '#1D4ED8';
       const textColor = '#0F172A';
       const mutedColor = '#64748B';
       const borderColor = '#E2E8F0';
+
+      const siteName = siteSettings?.general?.siteName || 'mediShop';
+      const tagline = siteSettings?.general?.tagline || 'DIGITAL PHARMACY (Verified DGDA #DAR-2026-BD)';
+      const contactPhone = siteSettings?.general?.contactPhone || '16780';
+      const contactEmail = siteSettings?.general?.contactEmail || 'support@medishop.com.bd';
 
       const orderNum = order.orderNumber || order.id || 'N/A';
       const invoiceNum = order.invoiceNumber || `INV-${orderNum}`;
@@ -27,9 +32,9 @@ export async function generateInvoice(order: any, siteSettings?: any): Promise<B
       const warrantyText = siteSettings?.legal?.warrantyPolicyContent || 'Manufacturer warranty applies where applicable with official invoice.';
 
       // 1. Header Section
-      doc.fillColor(primaryBlue).fontSize(26).font('Helvetica-Bold').text('mediShop', 36, 36);
-      doc.fillColor('#059669').fontSize(9).font('Helvetica-Bold').text('DIGITAL PHARMACY  (Verified DGDA #DAR-2026-BD)', 36, 66);
-      doc.fillColor(mutedColor).fontSize(8.5).font('Helvetica').text('Hotline: 16780 | Email: support@medishop.com.bd', 36, 79);
+      doc.fillColor(primaryBlue).fontSize(24).font('Helvetica-Bold').text(siteName, 36, 36);
+      doc.fillColor('#059669').fontSize(9).font('Helvetica-Bold').text(tagline.toUpperCase(), 36, 66);
+      doc.fillColor(mutedColor).fontSize(8.5).font('Helvetica').text(`Hotline: ${contactPhone} | Email: ${contactEmail}`, 36, 79);
 
       // Invoice Title & Metadata (Right Aligned)
       doc.fillColor(primaryBlue).fontSize(15).font('Helvetica-Bold').text('INVOICE', 360, 36, { align: 'right' });
@@ -152,13 +157,13 @@ export async function generateInvoice(order: any, siteSettings?: any): Promise<B
       doc.fillColor(mutedColor).fontSize(7.5).font('Helvetica').text('Guaranteed 100% genuine DGDA certified medicines.', 36, y + 12, { width: 160 });
 
       doc.fillColor(primaryBlue).fontSize(8.5).font('Helvetica-Bold').text('CUSTOMER SUPPORT', 220, y);
-      doc.fillColor(mutedColor).fontSize(7.5).font('Helvetica').text('Hotline: 16780\nEmail: support@medishop.com.bd', 220, y + 12, { width: 160 });
+      doc.fillColor(mutedColor).fontSize(7.5).font('Helvetica').text(`Hotline: ${contactPhone}\nEmail: ${contactEmail}`, 220, y + 12, { width: 160 });
 
       doc.fillColor(primaryBlue).fontSize(8.5).font('Helvetica-Bold').text('IMPORTANT NOTICE', 400, y);
       doc.fillColor(mutedColor).fontSize(7.5).font('Helvetica').text('Computer-generated tax invoice. No physical signature required.', 400, y + 12, { width: 160 });
 
       // Bottom Tagline
-      doc.fillColor(primaryBlue).fontSize(8.5).font('Helvetica-Bold').text('Thank you for choosing mediShop — Your Trusted Digital Pharmacy.', 36, y + 42, { align: 'center', width: 523 });
+      doc.fillColor(primaryBlue).fontSize(8.5).font('Helvetica-Bold').text(`Thank you for choosing ${siteName} — ${tagline}.`, 36, y + 42, { align: 'center', width: 523 });
 
       doc.end();
     } catch (error) {

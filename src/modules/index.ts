@@ -15,6 +15,8 @@ import prescriptionRouter from './prescription/prescription.route';
 import productRouter from './product/product.route';
 import settingsRouter from './settings/settings.route';
 import userRouter from './user/user.route';
+import chatRouter from './chat/chat.route';
+import uploadRouter from './upload/upload.route';
 
 export const registerModuleRoutes = (app: Application) => {
   app.use('/api/v1/auth', authRouter);
@@ -33,4 +35,6 @@ export const registerModuleRoutes = (app: Application) => {
   app.use('/api/v1/admin', adminRouter);
   app.use('/api/v1/courier', courierRouter);
   app.use('/api/v1/settings', settingsRouter);
+  app.use('/api/v1/chat', chatRouter);
+  app.use('/api/v1/upload', uploadRouter);
 };

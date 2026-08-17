@@ -1,8 +1,9 @@
 import multer from 'multer';
 import { AppError } from '../utils/AppError';
 import { cloudinary } from '../config/cloudinary';
+import { logger } from './requestLogger';
 
-// Configure multer memory storage (files stored in memory buffer for stream uploading)
+// Configure multer memory storage (files stored in memory buffer for stream uploading & Sharp processing)
 const storage = multer.memoryStorage();
 
 const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
@@ -17,20 +18,37 @@ export const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit per image
+    fileSize: 10 * 1024 * 1024, // 10MB limit per upload
   },
 });
 
-export const uploadToCloudinary = (buffer: Buffer, folder = 'medishop/products'): Promise<string> => {
-  return new Promise((resolve, reject) => {
+export const uploadToCloudinary = (
+  buffer: Buffer,
+  folder = 'medishop/products',
+  format = 'webp'
+): Promise<string> => {
+  return new Promise((resolve) => {
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+
+    if (!cloudName || !apiKey || cloudName === 'demo' || apiKey === 'demo') {
+      const mime = format === 'webp' ? 'image/webp' : 'image/jpeg';
+      const base64 = `data:${mime};base64,${buffer.toString('base64')}`;
+      return resolve(base64);
+    }
+
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder,
         resource_type: 'image',
+        format,
       },
       (error, result) => {
         if (error) {
-          return reject(new AppError('Cloudinary image upload failed', 500, 'CLOUDINARY_ERROR'));
+          logger.warn({ error }, 'Cloudinary upload failed, falling back to WebP data URI');
+          const mime = format === 'webp' ? 'image/webp' : 'image/jpeg';
+          const base64 = `data:${mime};base64,${buffer.toString('base64')}`;
+          return resolve(base64);
         }
         resolve(result?.secure_url || '');
       }

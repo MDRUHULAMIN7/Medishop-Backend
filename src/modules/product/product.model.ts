@@ -41,6 +41,7 @@ const productSchema = new Schema<IProduct>(
       {
         unit: { type: String, enum: UNIT_TYPES, required: true },
         baseUnitQty: { type: Number, required: true, min: 1, default: 1 },
+        buyingPrice: { type: Number, min: 0, default: 0 },
         price: { type: Number, required: true, min: 0 },
         mrp: { type: Number, min: 0 },
         discountPrice: { type: Number, min: 0 },
@@ -63,6 +64,7 @@ const productSchema = new Schema<IProduct>(
         unit: { type: String, enum: UNIT_TYPES, required: true },
         unitLabelBn: { type: String, trim: true },
         unitLabelEn: { type: String, trim: true },
+        buyingPrice: { type: Number, min: 0, default: 0 },
         price: { type: Number, required: true, min: 0 },
         mrp: { type: Number, min: 0 },
         discountPrice: { type: Number, min: 0 },
@@ -77,6 +79,7 @@ const productSchema = new Schema<IProduct>(
     category: { type: Schema.Types.ObjectId, ref: 'Category', required: true, index: true },
     brand: { type: Schema.Types.ObjectId, ref: 'Brand', required: true, index: true },
     price: { type: Number, required: true, min: 0 },
+    buyingPrice: { type: Number, min: 0, default: 0, select: false },
     discountPrice: { type: Number, min: 0, default: undefined },
     stock: { type: Number, required: true, min: 0, default: 0 },
     expiryDate: { type: Date, default: null },

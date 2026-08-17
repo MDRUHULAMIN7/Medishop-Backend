@@ -12,6 +12,7 @@ const notificationSchema = new Schema<INotification>(
         'prescription_submitted',
         'prescription_approved',
         'prescription_rejected',
+        'live_chat_message',
         'system_announcement',
       ],
       required: true,

@@ -9,6 +9,7 @@ const CACHE_TTL_SECONDS = 86400; // 24 Hours TTL
 const toPublicSettings = (doc: SiteSettingsDocumentData): PublicSiteSettings => ({
   general: doc.general,
   branding: doc.branding,
+  banners: doc.banners || [],
   payment: doc.payment,
   shipping: doc.shipping,
   seo: doc.seo,
@@ -66,6 +67,9 @@ export class SettingsRepository {
     }
     if (input.branding) {
       current.branding = { ...current.branding, ...input.branding };
+    }
+    if (input.banners) {
+      current.banners = input.banners;
     }
     if (input.payment) {
       current.payment = { ...current.payment, ...input.payment };

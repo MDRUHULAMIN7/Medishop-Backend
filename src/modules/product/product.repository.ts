@@ -22,18 +22,18 @@ const toResponse = (product: any): ProductResponse => {
   const categoryObj =
     product.category && typeof product.category === 'object'
       ? {
-          id: product.category._id.toString(),
-          name: product.category.name,
-          slug: product.category.slug,
+          id: (product.category._id || product.category.id || '').toString(),
+          name: product.category.name || '',
+          slug: product.category.slug || '',
         }
       : { id: product.category?.toString() || '', name: '', slug: '' };
 
   const brandObj =
     product.brand && typeof product.brand === 'object'
       ? {
-          id: product.brand._id.toString(),
-          name: product.brand.name,
-          slug: product.brand.slug,
+          id: (product.brand._id || product.brand.id || '').toString(),
+          name: product.brand.name || '',
+          slug: product.brand.slug || '',
           logo: product.brand.logo || '',
         }
       : { id: product.brand?.toString() || '', name: '', slug: '', logo: '' };
@@ -92,8 +92,9 @@ const toResponse = (product: any): ProductResponse => {
     isDefault: p.isDefault,
   }));
 
-  return {
-    id: product._id.toString(),
+  // ZERO EXPOSURE SECURITY GUARANTEE: Never include buyingPrice in public response
+  const response: ProductResponse = {
+    id: product._id ? product._id.toString() : product.id,
     name: product.name,
     slug: product.slug,
     genericName: product.genericName,
@@ -125,306 +126,351 @@ const toResponse = (product: any): ProductResponse => {
     createdAt: product.createdAt,
     updatedAt: product.updatedAt,
   };
+
+  return response;
+};
+
+const toAdminResponse = (product: any): ProductResponse => {
+  const base = toResponse(product);
+  const adminPackaging = (base.packaging || []).map((p: any, idx: number) => {
+    const rawP = Array.isArray(product.packaging) ? (product.packaging.find((x: any) => x.unit === p.unit) || product.packaging[idx]) : null;
+    const rawU = Array.isArray(product.unitPrices) ? (product.unitPrices.find((x: any) => x.unit === p.unit) || product.unitPrices[idx]) : null;
+    const tierBuying = (rawP && typeof rawP.buyingPrice === 'number' && rawP.buyingPrice > 0)
+      ? rawP.buyingPrice
+      : (rawU && typeof rawU.buyingPrice === 'number' && rawU.buyingPrice > 0)
+      ? rawU.buyingPrice
+      : (rawP?.buyingPrice ?? rawU?.buyingPrice ?? (product.buyingPrice ? Number(product.buyingPrice) * (p.baseUnitQty || 1) : 0));
+    return {
+      ...p,
+      buyingPrice: Number(tierBuying || 0),
+    };
+  });
+  const adminUnitPrices = (base.unitPrices || []).map((u: any, idx: number) => {
+    const rawP = Array.isArray(product.packaging) ? (product.packaging.find((x: any) => x.unit === u.unit) || product.packaging[idx]) : null;
+    const rawU = Array.isArray(product.unitPrices) ? (product.unitPrices.find((x: any) => x.unit === u.unit) || product.unitPrices[idx]) : null;
+    const tierBuying = (rawU && typeof rawU.buyingPrice === 'number' && rawU.buyingPrice > 0)
+      ? rawU.buyingPrice
+      : (rawP && typeof rawP.buyingPrice === 'number' && rawP.buyingPrice > 0)
+      ? rawP.buyingPrice
+      : (rawU?.buyingPrice ?? rawP?.buyingPrice ?? (product.buyingPrice ? Number(product.buyingPrice) * (u.multiplier || 1) : 0));
+    return {
+      ...u,
+      buyingPrice: Number(tierBuying || 0),
+    };
+  });
+  const defaultTier = adminUnitPrices.find((u: any) => u.isDefault) || adminUnitPrices[0];
+
+  return {
+    ...base,
+    packaging: adminPackaging,
+    unitPrices: adminUnitPrices,
+    buyingPrice: defaultTier?.buyingPrice ?? (product.buyingPrice !== undefined ? Number(product.buyingPrice) : 0),
+  };
 };
 
 const isValidObjectId = (val?: string): boolean => {
-  return Boolean(val && typeof val === 'string' && Types.ObjectId.isValid(val) && /^[0-9a-fA-F]{24}$/.test(val));
+  if (!val) return false;
+  return Types.ObjectId.isValid(val) && new Types.ObjectId(val).toString() === val;
 };
 
 export class ProductRepository {
-  async findWithFilters(query: ProductFilterQuery) {
-    const page = Math.max(Number(query.page || 1), 1);
-    const limit = Math.min(Math.max(Number(query.limit || 20), 1), 100);
-    const skip = (page - 1) * limit;
+  async findRawById(id: string) {
+    if (!isValidObjectId(id)) return null;
+    return ProductModel.findById(id).lean();
+  }
+
+  async findRawBySlug(slug: string) {
+    return ProductModel.findOne({ slug: slug.toLowerCase() }).lean();
+  }
+
+  async findById(id: string) {
+    if (!isValidObjectId(id)) return null;
+    const doc = await ProductModel.findById(id)
+      .select('-buyingPrice')
+      .populate('category', 'name slug')
+      .populate('brand', 'name slug logo')
+      .lean();
+    return doc ? toResponse(doc) : null;
+  }
+
+  async findAdminById(id: string) {
+    if (!isValidObjectId(id)) return null;
+    const doc = await ProductModel.findById(id)
+      .select('+buyingPrice')
+      .populate('category', 'name slug')
+      .populate('brand', 'name slug logo')
+      .lean();
+    return doc ? toAdminResponse(doc) : null;
+  }
+
+  async findBySlug(slug: string) {
+    const doc = await ProductModel.findOne({ slug: slug.toLowerCase() })
+      .select('-buyingPrice')
+      .populate('category', 'name slug')
+      .populate('brand', 'name slug logo')
+      .lean();
+    return doc ? toResponse(doc) : null;
+  }
+
+  async findByIdOrSlug(idOrSlug: string) {
+    if (isValidObjectId(idOrSlug)) {
+      return this.findById(idOrSlug);
+    }
+    return this.findBySlug(idOrSlug);
+  }
+
+  async findAdminByIdOrSlug(idOrSlug: string) {
+    if (isValidObjectId(idOrSlug)) {
+      return this.findAdminById(idOrSlug);
+    }
+    const doc = await ProductModel.findOne({ slug: idOrSlug.toLowerCase() })
+      .select('+buyingPrice')
+      .populate('category', 'name slug')
+      .populate('brand', 'name slug logo')
+      .lean();
+    return doc ? toAdminResponse(doc) : null;
+  }
+
+  async findAll(query: ProductFilterQuery = {}) {
+    const {
+      page = 1,
+      limit = 20,
+      sort = '-createdAt',
+      search,
+      category,
+      brand,
+      dosageForm,
+      unitType,
+      isFeatured,
+      requiresPrescription,
+      minPrice,
+      maxPrice,
+      includeInactive = false,
+    } = query;
 
     const filter: FilterQuery<any> = {};
 
-    if (!query.includeInactive) {
-      filter.isActive = { $ne: false };
+    if (!includeInactive) {
+      filter.isActive = true;
     }
 
-    if (query.category) {
-      const rawCats = Array.isArray(query.category)
-        ? query.category
-        : String(query.category).split(',').map((s) => s.trim()).filter(Boolean);
-
-      if (rawCats.length > 0) {
-        const catObjectIds: Types.ObjectId[] = [];
-        for (const catInput of rawCats) {
-          if (isValidObjectId(catInput)) {
-            catObjectIds.push(new Types.ObjectId(catInput));
-          } else {
-            const catSlug = catInput.toLowerCase();
-            const cat = await CategoryModel.findOne({
-              $or: [
-                { slug: catSlug },
-                { name: new RegExp(`^${catSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-              ],
-            });
-            if (cat) {
-              catObjectIds.push(cat._id);
-            }
-          }
-        }
-        if (catObjectIds.length > 0) {
-          filter.category = { $in: catObjectIds };
-        } else {
-          filter.category = new Types.ObjectId();
-        }
+    if (category) {
+      if (isValidObjectId(category)) {
+        filter.category = new Types.ObjectId(category);
+      } else {
+        const catDoc: any = await CategoryModel.findOne({ slug: category }).lean();
+        if (catDoc) filter.category = catDoc._id;
+        else return { products: [], total: 0, page, limit, totalPages: 0 };
       }
     }
 
-    if (query.brand) {
-      const rawBrands = Array.isArray(query.brand)
-        ? query.brand
-        : String(query.brand).split(',').map((s) => s.trim()).filter(Boolean);
-
-      if (rawBrands.length > 0) {
-        const brandObjectIds: Types.ObjectId[] = [];
-        for (const brandInput of rawBrands) {
-          if (isValidObjectId(brandInput)) {
-            brandObjectIds.push(new Types.ObjectId(brandInput));
-          } else {
-            const brandSlug = brandInput.toLowerCase();
-            const brandObj = await BrandModel.findOne({
-              $or: [
-                { slug: brandSlug },
-                { name: new RegExp(`^${brandSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-              ],
-            });
-            if (brandObj) {
-              brandObjectIds.push(brandObj._id);
-            }
-          }
-        }
-        if (brandObjectIds.length > 0) {
-          filter.brand = { $in: brandObjectIds };
-        } else {
-          filter.brand = new Types.ObjectId();
-        }
+    if (brand) {
+      if (isValidObjectId(brand)) {
+        filter.brand = new Types.ObjectId(brand);
+      } else {
+        const brandDoc: any = await BrandModel.findOne({ slug: brand }).lean();
+        if (brandDoc) filter.brand = brandDoc._id;
+        else return { products: [], total: 0, page, limit, totalPages: 0 };
       }
     }
 
-    if (query.dosageForm) {
-      filter.dosageForm = query.dosageForm;
-    }
+    if (dosageForm) filter.dosageForm = dosageForm;
+    if (unitType) filter.unitType = unitType;
+    if (typeof isFeatured === 'boolean') filter.isFeatured = isFeatured;
+    if (typeof requiresPrescription === 'boolean') filter.requiresPrescription = requiresPrescription;
 
-    if (query.unitType) {
-      filter.unitType = query.unitType;
-    }
-
-    if (query.isFeatured !== undefined) {
-      filter.isFeatured = query.isFeatured;
-    }
-
-    if (query.requiresPrescription !== undefined) {
-      filter.requiresPrescription = query.requiresPrescription;
-    }
-
-    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+    if (minPrice !== undefined || maxPrice !== undefined) {
       filter.price = {};
-      if (query.minPrice !== undefined) filter.price.$gte = Number(query.minPrice);
-      if (query.maxPrice !== undefined) filter.price.$lte = Number(query.maxPrice);
+      if (minPrice !== undefined) filter.price.$gte = Number(minPrice);
+      if (maxPrice !== undefined) filter.price.$lte = Number(maxPrice);
     }
 
-    const hasSearch = Boolean(query.search && query.search.trim());
-    if (hasSearch) {
-      const q = query.search!.trim();
-      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const searchRegex = new RegExp(escaped, 'i');
-
+    if (search && search.trim()) {
       filter.$or = [
-        { name: searchRegex },
-        { genericName: searchRegex },
-        { tags: searchRegex },
-        { dosageForm: searchRegex },
-        { strength: searchRegex },
+        { name: { $regex: search.trim(), $options: 'i' } },
+        { genericName: { $regex: search.trim(), $options: 'i' } },
       ];
     }
 
-    // Determine sort options
-    let sortOptions: any = {};
-    let projection: any = null;
+    const skip = (page - 1) * limit;
 
-    if (query.sort === 'price-asc') sortOptions = { price: 1 };
-    else if (query.sort === 'price-desc') sortOptions = { price: -1 };
-    else if (query.sort === 'rating') sortOptions = { ratingAverage: -1 };
-    else if (query.sort === 'name') sortOptions = { name: 1 };
-    else if (query.sort === '-createdAt') sortOptions = { createdAt: -1 };
-    else if (query.sort === 'createdAt') sortOptions = { createdAt: 1 };
-    else {
-      sortOptions = { createdAt: -1 };
-    }
-
-    const summaryProjection: any = projection ? { ...projection } : {};
-    summaryProjection.name = 1;
-    summaryProjection.slug = 1;
-    summaryProjection.genericName = 1;
-    summaryProjection.dosageForm = 1;
-    summaryProjection.strength = 1;
-    summaryProjection.baseUnit = 1;
-    summaryProjection.unitType = 1;
-    summaryProjection.packaging = 1;
-    summaryProjection.unitPrices = 1;
-    summaryProjection.stockCached = 1;
-    summaryProjection.stock = 1;
-    summaryProjection.category = 1;
-    summaryProjection.brand = 1;
-    summaryProjection.price = 1;
-    summaryProjection.discountPrice = 1;
-    summaryProjection.expiryDate = 1;
-    summaryProjection.batchNumber = 1;
-    summaryProjection.images = { $slice: 1 };
-    summaryProjection.requiresPrescription = 1;
-    summaryProjection.isFeatured = 1;
-    summaryProjection.isActive = 1;
-    summaryProjection.ratingAverage = 1;
-    summaryProjection.ratingCount = 1;
-    summaryProjection.createdAt = 1;
-    summaryProjection.updatedAt = 1;
-
-    let queryBuilder = ProductModel.find(filter, summaryProjection)
-      .populate('category', 'name slug')
-      .populate('brand', 'name slug logo')
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limit)
-      .lean();
-
-    const [products, total] = await Promise.all([
-      queryBuilder,
+    const [docs, total] = await Promise.all([
+      ProductModel.find(filter)
+        .select('-buyingPrice')
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .populate('category', 'name slug')
+        .populate('brand', 'name slug logo')
+        .lean(),
       ProductModel.countDocuments(filter),
     ]);
 
+    const products = docs.map(toResponse);
+    const totalPages = Math.ceil(total / limit);
+
     return {
-      products: products.map(toResponse),
+      products,
+      total,
+      page,
+      limit,
+      totalPages,
       meta: {
+        total,
         page,
         limit,
-        total,
-        pages: Math.ceil(total / limit),
+        totalPages,
       },
     };
   }
 
-  async findSuggestions(rawQuery: string, limit = 8): Promise<SearchSuggestionItem[]> {
-    const q = rawQuery.trim();
-    if (!q) return [];
-
-    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(escaped, 'i');
-
-    const [products, categories, brands] = await Promise.all([
-      ProductModel.find(
-        { isActive: true, $or: [{ name: regex }, { genericName: regex }, { tags: regex }] },
-        { name: 1, slug: 1, genericName: 1, dosageForm: 1, strength: 1, category: 1, brand: 1 }
-      )
-        .populate('category', 'name')
-        .populate('brand', 'name')
-        .limit(limit)
-        .lean(),
-
-      CategoryModel.find({ isActive: true, name: regex }, { name: 1, slug: 1 }).limit(3).lean(),
-
-      BrandModel.find({ isActive: true, name: regex }, { name: 1, slug: 1 }).limit(3).lean(),
-    ]);
-
-    const suggestions: SearchSuggestionItem[] = [];
-
-    // Map Category matches
-    categories.forEach((cat: any) => {
-      suggestions.push({
-        id: cat._id.toString(),
-        type: 'category',
-        text: cat.name,
-        slug: cat.slug,
-      });
-    });
-
-    // Map Brand matches
-    brands.forEach((b: any) => {
-      suggestions.push({
-        id: b._id.toString(),
-        type: 'brand',
-        text: b.name,
-        slug: b.slug,
-      });
-    });
-
-    // Map Product matches & Generic name matches
-    const addedGenerics = new Set<string>();
-
-    products.forEach((prod: any) => {
-      // Add product suggestion
-      suggestions.push({
-        id: prod._id.toString(),
-        type: 'product',
-        text: prod.name,
-        slug: prod.slug,
-        dosageForm: prod.dosageForm,
-        strength: prod.strength,
-        categoryName: prod.category?.name,
-        brandName: prod.brand?.name,
-      });
-
-      // Add generic suggestion if matches and not duplicate
-      if (prod.genericName && regex.test(prod.genericName) && !addedGenerics.has(prod.genericName.toLowerCase())) {
-        addedGenerics.add(prod.genericName.toLowerCase());
-        suggestions.push({
-          id: `generic-${prod._id.toString()}`,
-          type: 'generic',
-          text: prod.genericName,
-          slug: prod.slug,
-          dosageForm: prod.dosageForm,
-        });
-      }
-    });
-
-    return suggestions.slice(0, limit);
+  async findWithFilters(query: ProductFilterQuery = {}) {
+    return this.findAll(query);
   }
 
   async findFeatured(limit = 10) {
-    const products = await ProductModel.find({ isFeatured: true, isActive: true })
-      .populate('category', 'name slug')
-      .populate('brand', 'name slug logo')
-      .sort({ createdAt: -1 })
+    const res = await this.findAll({ isFeatured: true, limit, includeInactive: false });
+    return res.products;
+  }
+
+  async findSuggestions(queryText: string, limit = 8): Promise<SearchSuggestionItem[]> {
+    const regex = new RegExp(queryText.trim(), 'i');
+    const docs = await ProductModel.find({
+      isActive: true,
+      $or: [{ name: regex }, { genericName: regex }],
+    })
+      .select('name slug genericName dosageForm strength')
       .limit(limit)
       .lean();
-    return products.map(toResponse);
+
+    return docs.map((d: any) => ({
+      id: d._id.toString(),
+      type: 'product',
+      text: d.name,
+      slug: d.slug,
+      dosageForm: d.dosageForm,
+      strength: d.strength,
+    }));
   }
 
-  async findByIdOrSlug(idOrSlug: string) {
-    const isObjectId = Types.ObjectId.isValid(idOrSlug);
-    const filter = isObjectId ? { _id: idOrSlug } : { slug: idOrSlug.toLowerCase() };
+  async findAdminProducts(query: ProductFilterQuery = {}) {
+    const {
+      page = 1,
+      limit = 50,
+      sort = '-createdAt',
+      search,
+      category,
+      brand,
+      dosageForm,
+      unitType,
+      isFeatured,
+      requiresPrescription,
+      minPrice,
+      maxPrice,
+      includeInactive = true,
+    } = query;
 
-    const product = await ProductModel.findOne(filter)
-      .populate('category', 'name slug')
-      .populate('brand', 'name slug logo')
-      .lean();
+    const filter: FilterQuery<any> = {};
 
-    return product ? toResponse(product) : null;
-  }
+    if (!includeInactive) {
+      filter.isActive = true;
+    }
 
-  async findRawById(id: string) {
-    return ProductModel.findById(id);
-  }
+    if (category) {
+      if (isValidObjectId(category)) {
+        filter.category = new Types.ObjectId(category);
+      } else {
+        const catDoc: any = await CategoryModel.findOne({ slug: category }).lean();
+        if (catDoc) filter.category = catDoc._id;
+        else return { products: [], total: 0, page, limit, totalPages: 0, meta: { total: 0, page, limit, totalPages: 0 } };
+      }
+    }
 
-  async findRawBySlug(slug: string) {
-    return ProductModel.findOne({ slug: slug.toLowerCase() });
+    if (brand) {
+      if (isValidObjectId(brand)) {
+        filter.brand = new Types.ObjectId(brand);
+      } else {
+        const brandDoc: any = await BrandModel.findOne({ slug: brand }).lean();
+        if (brandDoc) filter.brand = brandDoc._id;
+        else return { products: [], total: 0, page, limit, totalPages: 0, meta: { total: 0, page, limit, totalPages: 0 } };
+      }
+    }
+
+    if (dosageForm) filter.dosageForm = dosageForm;
+    if (unitType) filter.unitType = unitType;
+    if (typeof isFeatured === 'boolean') filter.isFeatured = isFeatured;
+    if (typeof requiresPrescription === 'boolean') filter.requiresPrescription = requiresPrescription;
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      filter.price = {};
+      if (minPrice !== undefined) filter.price.$gte = Number(minPrice);
+      if (maxPrice !== undefined) filter.price.$lte = Number(maxPrice);
+    }
+
+    if (search && search.trim()) {
+      filter.$or = [
+        { name: { $regex: search.trim(), $options: 'i' } },
+        { genericName: { $regex: search.trim(), $options: 'i' } },
+      ];
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [docs, total] = await Promise.all([
+      ProductModel.find(filter)
+        .select('+buyingPrice')
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .populate('category', 'name slug')
+        .populate('brand', 'name slug logo')
+        .lean(),
+      ProductModel.countDocuments(filter),
+    ]);
+
+    const products = docs.map(toAdminResponse);
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      products,
+      total,
+      page,
+      limit,
+      totalPages,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+      },
+    };
   }
 
   async create(data: CreateProductInput) {
-    const rawTiers = Array.isArray((data as any).packaging) && (data as any).packaging.length > 0
-      ? (data as any).packaging
-      : Array.isArray((data as any).unitPrices) && (data as any).unitPrices.length > 0
-      ? (data as any).unitPrices
+    const categoryId = new Types.ObjectId(data.category);
+    const brandId = new Types.ObjectId(data.brand);
+
+    const generatedSlug =
+      data.slug ||
+      data.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '');
+
+    const initialStock = Number(data.stock || data.stockCached || 0);
+
+    const rawTiers = Array.isArray(data.packaging) && data.packaging.length > 0
+      ? data.packaging
+      : Array.isArray(data.unitPrices) && data.unitPrices.length > 0
+      ? data.unitPrices
       : [];
 
     const packaging = rawTiers.map((p: any) => ({
       unit: p.unit || 'pcs',
       baseUnitQty: Number(p.baseUnitQty || p.multiplier || 1),
-      price: Number(p.price || data.price || 0),
-      mrp: p.mrp ? Number(p.mrp) : Number(p.price || data.price || 0),
+      buyingPrice: Number(p.buyingPrice !== undefined ? p.buyingPrice : (data.buyingPrice || 0)),
+      price: Number(p.price || data.price),
+      mrp: p.mrp ? Number(p.mrp) : Number(p.price || data.price),
       discountPrice: p.discountPrice ? Number(p.discountPrice) : undefined,
       barcode: p.barcode || undefined,
       isDefault: Boolean(p.isDefault),
@@ -435,18 +481,26 @@ export class ProductRepository {
       unit: p.unit,
       unitLabelBn: p.unit === 'pcs' ? 'পিস' : p.unit === 'strip' ? 'পাতা' : p.unit === 'box' ? 'বক্স' : p.unit === 'bottle' ? 'বোতল' : p.unit === 'tube' ? 'টিউব' : p.unit === 'pack' ? 'প্যাক' : p.unit,
       unitLabelEn: p.unit,
+      buyingPrice: p.buyingPrice,
       price: p.price,
       mrp: p.mrp,
       discountPrice: p.discountPrice,
-      stock: 0,
+      stock: Math.floor(initialStock / p.baseUnitQty),
       multiplier: p.baseUnitQty,
       isDefault: p.isDefault,
     }));
 
+    const defaultPackagingTier = packaging.find((p: any) => p.isDefault) || packaging[0];
+    const computedBuyingPrice = defaultPackagingTier ? defaultPackagingTier.buyingPrice : (data.buyingPrice !== undefined ? Number(data.buyingPrice) : 0);
+
     const product = await ProductModel.create({
       ...data,
-      category: new Types.ObjectId(data.category),
-      brand: new Types.ObjectId(data.brand),
+      slug: generatedSlug,
+      category: categoryId,
+      brand: brandId,
+      stockCached: initialStock,
+      stock: initialStock,
+      buyingPrice: computedBuyingPrice,
       ...(packaging.length > 0 && { packaging, unitPrices }),
       expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
     });
@@ -456,7 +510,7 @@ export class ProductRepository {
       { path: 'brand', select: 'name slug logo' },
     ]);
 
-    return toResponse(populated.toObject());
+    return toAdminResponse(populated.toObject());
   }
 
   async update(id: string, data: UpdateProductInput) {
@@ -465,6 +519,9 @@ export class ProductRepository {
     if (data.brand) updatePayload.brand = new Types.ObjectId(data.brand);
     if (data.expiryDate !== undefined) {
       updatePayload.expiryDate = data.expiryDate ? new Date(data.expiryDate) : null;
+    }
+    if (data.buyingPrice !== undefined) {
+      updatePayload.buyingPrice = Number(data.buyingPrice);
     }
 
     if (data.stock !== undefined) {
@@ -482,6 +539,7 @@ export class ProductRepository {
       const packaging = rawTiers.map((p: any) => ({
         unit: p.unit || 'pcs',
         baseUnitQty: Number(p.baseUnitQty || p.multiplier || 1),
+        buyingPrice: Number(p.buyingPrice !== undefined ? p.buyingPrice : (data.buyingPrice || 0)),
         price: Number(p.price || data.price || 0),
         mrp: p.mrp ? Number(p.mrp) : Number(p.price || data.price || 0),
         discountPrice: p.discountPrice ? Number(p.discountPrice) : undefined,
@@ -494,6 +552,7 @@ export class ProductRepository {
         unit: p.unit,
         unitLabelBn: p.unit === 'pcs' ? 'পিস' : p.unit === 'strip' ? 'পাতা' : p.unit === 'box' ? 'বক্স' : p.unit === 'bottle' ? 'বোতল' : p.unit === 'tube' ? 'টিউব' : p.unit === 'pack' ? 'প্যাক' : p.unit,
         unitLabelEn: p.unit,
+        buyingPrice: p.buyingPrice,
         price: p.price,
         mrp: p.mrp,
         discountPrice: p.discountPrice,
@@ -501,6 +560,11 @@ export class ProductRepository {
         multiplier: p.baseUnitQty,
         isDefault: p.isDefault,
       }));
+
+      const defaultPackagingTier = packaging.find((p: any) => p.isDefault) || packaging[0];
+      if (defaultPackagingTier) {
+        updatePayload.buyingPrice = defaultPackagingTier.buyingPrice;
+      }
 
       updatePayload.packaging = packaging;
       updatePayload.unitPrices = unitPrices;
@@ -510,11 +574,12 @@ export class ProductRepository {
       new: true,
       runValidators: true,
     })
+      .select('+buyingPrice')
       .populate('category', 'name slug')
       .populate('brand', 'name slug logo')
       .lean();
 
-    return updated ? toResponse(updated) : null;
+    return updated ? toAdminResponse(updated) : null;
   }
 
   async delete(id: string) {

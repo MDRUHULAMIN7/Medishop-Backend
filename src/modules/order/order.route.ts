@@ -104,7 +104,7 @@ router.get('/my', getMyOrders);
  */
 router.get(
   '/',
-  authorize('admin', 'pharmacist'),
+  authorize('admin', 'super_admin', 'pharmacist', 'sales_staff', 'order_manager'),
   validateRequest({ query: orderQuerySchema }),
   getAllOrders
 );
@@ -128,6 +128,7 @@ router.get(
  *         description: Order details
  */
 router.get('/:id/invoice/download', validateRequest({ params: orderIdSchema }), downloadInvoice);
+router.get('/:id/invoice/pdf', validateRequest({ params: orderIdSchema }), downloadInvoice);
 
 router.get('/:id', validateRequest({ params: orderIdSchema }), getOrderById);
 
@@ -166,7 +167,7 @@ router.get('/:id', validateRequest({ params: orderIdSchema }), getOrderById);
  */
 router.patch(
   '/:id/status',
-  authorize('admin', 'pharmacist'),
+  authorize('admin', 'super_admin', 'pharmacist', 'sales_staff', 'order_manager'),
   validateRequest({ params: orderIdSchema, body: updateOrderStatusSchema }),
   updateOrderStatus
 );

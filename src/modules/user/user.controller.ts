@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import { HTTP_STATUS } from '../../config/constants';
 import { ApiResponse } from '../../utils/ApiResponse';
+import { AppError } from '../../utils/AppError';
 import { asyncHandler } from '../../utils/asyncHandler';
+import { ImageProcessor } from '../../utils/imageProcessor';
+import { uploadToCloudinary } from '../../middlewares/upload';
 import { userService } from './user.service';
 
 export const getMe = asyncHandler(async (req: Request, res: Response) => {
@@ -12,6 +15,19 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
 export const updateMe = asyncHandler(async (req: Request, res: Response) => {
   const user = await userService.updateProfile(req.user!.id, req.body);
   return ApiResponse.success(res, 'Profile updated successfully', user, HTTP_STATUS.OK);
+});
+
+export const uploadAvatar = asyncHandler(async (req: Request, res: Response) => {
+  const file = req.file;
+  if (!file) {
+    throw new AppError('No avatar image file provided', 400, 'NO_FILE_PROVIDED');
+  }
+
+  const processed = await ImageProcessor.processAvatarImage(file.buffer);
+  const avatarUrl = await uploadToCloudinary(processed.mainBuffer, 'medishop/avatars', 'webp');
+  const user = await userService.updateProfile(req.user!.id, { avatar: avatarUrl });
+
+  return ApiResponse.success(res, 'Avatar updated successfully', { user, avatarUrl }, HTTP_STATUS.OK);
 });
 
 export const getUserById = asyncHandler(async (req: Request, res: Response) => {

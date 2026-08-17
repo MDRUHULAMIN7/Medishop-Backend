@@ -1,4 +1,4 @@
-import { NotFoundError, ValidationError } from '../../utils/AppError';
+import { ConflictError, NotFoundError, ValidationError } from '../../utils/AppError';
 import { userRepository } from './user.repository';
 import { authRepository } from '../auth/auth.repository';
 import {
@@ -83,12 +83,36 @@ export class UserService {
       user.name = input.name.trim();
     }
 
-    if (input.email !== undefined && input.email.trim().toLowerCase() !== (user.email || '').toLowerCase()) {
-      throw new ValidationError('Email address is locked and cannot be modified for security purposes');
+    if (input.email !== undefined) {
+      const newEmail = input.email ? input.email.trim().toLowerCase() : '';
+      const currentEmail = (user.email || '').trim().toLowerCase();
+
+      if (currentEmail && newEmail && newEmail !== currentEmail) {
+        throw new ValidationError('Email address is permanently locked and cannot be modified');
+      } else if (!currentEmail && newEmail) {
+        // User adding email for the first time
+        const existing = await userRepository.findByEmail(newEmail);
+        if (existing && existing._id.toString() !== user._id.toString()) {
+          throw new ConflictError('This email is already associated with another account', 'EMAIL_IN_USE');
+        }
+        user.email = newEmail;
+      }
     }
 
-    if (input.phone !== undefined && normalizePhone(input.phone) !== (user.phone || '')) {
-      throw new ValidationError('Mobile phone number is locked and cannot be modified for security purposes');
+    if (input.phone !== undefined) {
+      const newPhone = input.phone ? normalizePhone(input.phone) : '';
+      const currentPhone = user.phone ? normalizePhone(user.phone) : '';
+
+      if (currentPhone && newPhone && newPhone !== currentPhone) {
+        throw new ValidationError('Mobile phone number is permanently locked and cannot be modified');
+      } else if (!currentPhone && newPhone) {
+        // User adding mobile number for the first time
+        const existing = await userRepository.findByPhone(newPhone);
+        if (existing && existing._id.toString() !== user._id.toString()) {
+          throw new ConflictError('This mobile phone number is already associated with another account', 'PHONE_IN_USE');
+        }
+        user.phone = newPhone;
+      }
     }
 
     if (input.avatar !== undefined) {
