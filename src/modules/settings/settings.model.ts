@@ -178,6 +178,7 @@ const siteSettingsSchema = new Schema<SiteSettingsDocumentData>(
             instructionsBn: String,
             instructionsEn: String,
             icon: String,
+            logo: String,
             isActive: Boolean,
             isDefault: Boolean,
           },

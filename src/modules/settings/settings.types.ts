@@ -11,6 +11,7 @@ export interface DynamicPaymentMethod {
   instructionsBn?: string;
   instructionsEn?: string;
   icon?: string;
+  logo?: string;
   isActive: boolean;
   isDefault?: boolean;
 }
