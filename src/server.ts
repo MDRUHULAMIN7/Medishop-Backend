@@ -19,7 +19,7 @@ const startServer = async () => {
     // 3. Start Express HTTP Server
     const server = app.listen(config.PORT, () => {
       console.log(`====================================================`);
-      console.log(`🚀 mediShop Backend API Server Running`);
+      console.log(`🚀 mediShop Backend API Server Active`);
       console.log(`📍 Environment : ${config.NODE_ENV}`);
       console.log(`🌐 Base URL    : http://localhost:${config.PORT}`);
       console.log(`🏥 Health Check: http://localhost:${config.PORT}/health`);
