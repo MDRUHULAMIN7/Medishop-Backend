@@ -68,7 +68,7 @@ const stockLedgerSchema = new Schema<IStockLedger>(
 stockLedgerSchema.index({ createdAt: -1 });
 
 export const StockLedgerModel =
-  models.StockLedger || model<IStockLedger>('StockLedger', stockLedgerSchema);
+  models.PosStockLedger || model<IStockLedger>('PosStockLedger', stockLedgerSchema);
 
 // 4. PosSale Schema
 const posSaleItemSchema = new Schema<IPosSaleItem>(
@@ -90,6 +90,9 @@ const posSaleSchema = new Schema<IPosSale>(
     soldBy: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     customerName: { type: String, trim: true, default: 'Walk-in Customer' },
     customerPhone: { type: String, trim: true },
+    customerEmail: { type: String, trim: true },
+    customerAddress: { type: String, trim: true },
+    customerUser: { type: Schema.Types.ObjectId, ref: 'User' },
     items: { type: [posSaleItemSchema], required: true },
     subtotal: { type: Number, required: true, min: 0 },
     discountTotal: { type: Number, default: 0, min: 0 },

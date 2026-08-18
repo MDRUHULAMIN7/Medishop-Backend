@@ -13,7 +13,7 @@ const LEDGER_TYPES = [
 const stockLedgerSchema = new Schema<IStockLedgerEntry>(
   {
     product: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
-    batch: { type: Schema.Types.ObjectId, ref: 'Batch', required: true, index: true },
+    batch: { type: Schema.Types.ObjectId, ref: 'Batch', default: null, index: true },
     type: { type: String, enum: LEDGER_TYPES, required: true, index: true },
     quantity: { type: Number, required: true }, // signed (+ / -) in baseUnit
     baseQtyNeeded: { type: Number },

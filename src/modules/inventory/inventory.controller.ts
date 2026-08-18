@@ -36,9 +36,33 @@ export const getBatches = asyncHandler(async (req: Request, res: Response) => {
   return ApiResponse.success(res, 'Product batches fetched successfully', batches);
 });
 
+export const getBatchesSummary = asyncHandler(async (_req: Request, res: Response) => {
+  const summary = await inventoryService.getBatchesSummary();
+  return ApiResponse.success(res, 'Batch summary fetched successfully', summary);
+});
+
+export const recalculateAllStock = asyncHandler(async (_req: Request, res: Response) => {
+  const result = await inventoryService.recalculateAllStock();
+  return ApiResponse.success(res, 'All product stocks recalculated successfully', result);
+});
+
 export const getLedger = asyncHandler(async (req: Request, res: Response) => {
-  const { productId } = req.params;
-  const limit = req.query.limit ? Number(req.query.limit) : 50;
+  const productId = (req.params.productId || req.query.productId) as string | undefined;
+  const limit = req.query.limit ? Number(req.query.limit) : 100;
   const ledger = await inventoryService.getLedger(productId, limit);
   return ApiResponse.success(res, 'Stock audit ledger fetched successfully', ledger);
 });
+
+export const updateBatch = asyncHandler(async (req: Request, res: Response) => {
+  const userId = (req as any).user?.id || (req as any).user?._id;
+  const batch = await inventoryService.updateBatch(req.params.batchId, req.body, userId);
+  return ApiResponse.success(res, 'Batch details updated successfully', batch);
+});
+
+export const deleteBatch = asyncHandler(async (req: Request, res: Response) => {
+  const userId = (req as any).user?.id || (req as any).user?._id;
+  const result = await inventoryService.deleteBatch(req.params.batchId, userId);
+  return ApiResponse.success(res, result.message, result);
+});
+
+

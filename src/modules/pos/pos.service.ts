@@ -1,6 +1,9 @@
+import { Types } from 'mongoose';
 import { emitToAdmins } from '../../socket';
+import { deleteRedisCachePattern } from '../../utils/redisCache';
 import { AppError, NotFoundError, ValidationError } from '../../utils/AppError';
 import { ProductModel } from '../product/product.model';
+import { PosSaleModel } from './pos.model';
 import { posRepository } from './pos.repository';
 import { CreateStoreInput, PosCheckoutInput, StockAdjustmentInput } from './pos.types';
 
@@ -121,10 +124,14 @@ export class PosService {
       });
     }
 
-    const discountTotal = input.discountTotal ? Number(input.discountTotal) : 0;
+    const discountTotal = input.discountTotal !== undefined
+      ? Number(input.discountTotal)
+      : input.discountAmount !== undefined
+      ? Number(input.discountAmount)
+      : 0;
     const taxAmount = input.taxAmount ? Number(input.taxAmount) : 0;
     const grandTotal = Math.max(0, subtotal - discountTotal + taxAmount);
-    const paidAmount = Number(input.paidAmount);
+    const paidAmount = input.paidAmount !== undefined && input.paidAmount > 0 ? Number(input.paidAmount) : grandTotal;
 
     if (paidAmount < grandTotal) {
       throw new ValidationError(
@@ -132,13 +139,13 @@ export class PosService {
       );
     }
 
-    const changeAmount = paidAmount - grandTotal;
+    const changeAmount = Math.max(0, paidAmount - grandTotal);
     const invoiceNumber = generateInvoiceNumber();
 
     // Deduct central stock & write to Stock Ledger for each item
     for (const itemSnapshot of saleItemSnapshots) {
       await ProductModel.findByIdAndUpdate(itemSnapshot.product, {
-        $inc: { stock: -itemSnapshot.quantity },
+        $inc: { stock: -itemSnapshot.quantity, stockCached: -itemSnapshot.quantity },
       });
 
       await posRepository.updateStock(
@@ -152,6 +159,13 @@ export class PosService {
       );
     }
 
+    await deleteRedisCachePattern('cache:products:*');
+
+    const safeCustomerUser =
+      input.customerUser && Types.ObjectId.isValid(input.customerUser)
+        ? new Types.ObjectId(input.customerUser)
+        : undefined;
+
     // Create POS Sale record
     const posSale = await posRepository.createPosSale({
       invoiceNumber,
@@ -159,6 +173,9 @@ export class PosService {
       soldBy: staffId,
       customerName: input.customerName || 'Walk-in Customer',
       customerPhone: input.customerPhone,
+      customerEmail: input.customerEmail,
+      customerAddress: input.customerAddress,
+      customerUser: safeCustomerUser,
       items: saleItemSnapshots,
       subtotal,
       discountTotal,
@@ -206,7 +223,7 @@ export class PosService {
     // Restore stock in Product central inventory & log to Stock Ledger
     for (const item of saleDoc.items) {
       await ProductModel.findByIdAndUpdate(item.product, {
-        $inc: { stock: item.quantity },
+        $inc: { stock: item.quantity, stockCached: item.quantity },
       });
 
       const storeIdStr =
@@ -225,6 +242,8 @@ export class PosService {
       );
     }
 
+    await deleteRedisCachePattern('cache:products:*');
+
     saleDoc.status = 'voided';
     saleDoc.voidedReason = reason;
 
@@ -233,6 +252,62 @@ export class PosService {
       status: 'voided',
       voidedReason: reason,
     });
+  }
+
+  async getTodayStats(staffId?: string) {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const todayFilter: any = {
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      status: 'completed',
+    };
+
+    const allTodaySales = await PosSaleModel.find(todayFilter).lean();
+
+    const todayTotalRevenue = allTodaySales.reduce((acc, s) => acc + (s.grandTotal || 0), 0);
+    const todayInvoiceCount = allTodaySales.length;
+    const totalItemsSold = allTodaySales.reduce((acc, s) => {
+      const itemsCount = Array.isArray(s.items) ? s.items.reduce((iAcc: number, item: any) => iAcc + (item.quantity || 0), 0) : 0;
+      return acc + itemsCount;
+    }, 0);
+
+    const avgBillValue = todayInvoiceCount > 0 ? todayTotalRevenue / todayInvoiceCount : 0;
+
+    const paymentBreakdown = {
+      cash: allTodaySales.filter((s) => s.paymentMethod === 'cash').reduce((acc, s) => acc + s.grandTotal, 0),
+      bkash: allTodaySales.filter((s) => s.paymentMethod === 'bkash').reduce((acc, s) => acc + s.grandTotal, 0),
+      nagad: allTodaySales.filter((s) => s.paymentMethod === 'nagad').reduce((acc, s) => acc + s.grandTotal, 0),
+      card: allTodaySales.filter((s) => s.paymentMethod === 'card').reduce((acc, s) => acc + s.grandTotal, 0),
+    };
+
+    // My personal sales today
+    let myTodaySales = 0;
+    let myInvoiceCount = 0;
+    if (staffId) {
+      const mySales = allTodaySales.filter((s) => s.soldBy?.toString() === staffId);
+      myTodaySales = mySales.reduce((acc, s) => acc + s.grandTotal, 0);
+      myInvoiceCount = mySales.length;
+    }
+
+    return {
+      todayTotalRevenue,
+      todayInvoiceCount,
+      totalItemsSold,
+      avgBillValue,
+      paymentBreakdown,
+      myTodaySales,
+      myInvoiceCount,
+      recentSales: allTodaySales.slice(-10).reverse(),
+    };
+  }
+
+  // Customer In-Store / POS Purchase History
+  async getCustomerPurchases(userId: string, userPhone?: string, userEmail?: string) {
+    return posRepository.findCustomerPurchases(userId, userPhone, userEmail);
   }
 }
 

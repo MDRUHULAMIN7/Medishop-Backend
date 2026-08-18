@@ -6,10 +6,12 @@ import {
   adjustStock,
   createStore,
   getInventoryList,
+  getMyCustomerPurchases,
   getPosSaleByInvoice,
   getPosSales,
   getStockLedger,
   getStores,
+  getTodayStats,
   processPosSale,
   voidPosSale,
 } from './pos.controller';
@@ -22,9 +24,28 @@ import {
 
 const router = Router();
 
-// All POS and Inventory endpoints require staff / admin authentication
+// Require user authentication
 router.use(authenticate);
-router.use(authorize('admin', 'pharmacist'));
+
+// 1. Customer Endpoint: Fetch logged in customer's in-store / POS purchases
+router.get('/my-purchases', getMyCustomerPurchases);
+
+// 2. Staff / Admin protected endpoints
+router.use(authorize('admin', 'super_admin', 'pharmacist', 'sales_staff', 'inventory_manager'));
+
+/**
+ * @openapi
+ * /pos/stats/today:
+ *   get:
+ *     summary: Get today's POS sales statistics, revenue, payment breakdown and staff metrics
+ *     tags: [Shared Inventory & POS]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Today's sales statistics
+ */
+router.get('/stats/today', getTodayStats);
 
 /**
  * @openapi

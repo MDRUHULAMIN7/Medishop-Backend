@@ -65,6 +65,9 @@ export interface IPosSale {
   soldBy: Types.ObjectId;
   customerName?: string;
   customerPhone?: string;
+  customerEmail?: string;
+  customerAddress?: string;
+  customerUser?: Types.ObjectId | string;
   items: IPosSaleItem[];
   subtotal: number;
   discountTotal: number;
@@ -100,6 +103,9 @@ export interface PosCheckoutInput {
   storeId?: string;
   customerName?: string;
   customerPhone?: string;
+  customerEmail?: string;
+  customerAddress?: string;
+  customerUser?: string | null;
   items: Array<{
     productId: string;
     quantity: number;
@@ -107,7 +113,9 @@ export interface PosCheckoutInput {
     batchNumber?: string;
   }>;
   discountTotal?: number;
+  discountAmount?: number;
   taxAmount?: number;
-  paidAmount: number;
+  paidAmount?: number;
   paymentMethod?: 'cash' | 'card' | 'bkash' | 'nagad';
+  note?: string;
 }

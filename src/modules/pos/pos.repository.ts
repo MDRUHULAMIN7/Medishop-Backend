@@ -112,6 +112,7 @@ export class PosRepository {
     return PosSaleModel.findById(id)
       .populate('store', 'name address phone code')
       .populate('soldBy', 'name role')
+      .populate('customerUser', 'name email phone role avatar addresses')
       .lean();
   }
 
@@ -119,6 +120,7 @@ export class PosRepository {
     return PosSaleModel.findOne({ invoiceNumber: invoiceNumber.trim().toUpperCase() })
       .populate('store', 'name address phone code')
       .populate('soldBy', 'name role')
+      .populate('customerUser', 'name email phone role avatar addresses')
       .lean();
   }
 
@@ -126,6 +128,31 @@ export class PosRepository {
     return PosSaleModel.find()
       .populate('store', 'name code')
       .populate('soldBy', 'name')
+      .populate('customerUser', 'name email phone role avatar addresses')
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  async findCustomerPurchases(userId: string, userPhone?: string, userEmail?: string) {
+    const filterOr: any[] = [];
+    if (userId && Types.ObjectId.isValid(userId)) {
+      filterOr.push({ customerUser: new Types.ObjectId(userId) });
+    }
+    if (userPhone && userPhone.trim()) {
+      filterOr.push({ customerPhone: userPhone.trim() });
+    }
+    if (userEmail && userEmail.trim()) {
+      filterOr.push({ customerEmail: userEmail.trim().toLowerCase() });
+    }
+
+    if (filterOr.length === 0) {
+      return [];
+    }
+
+    return PosSaleModel.find({ $or: filterOr })
+      .populate('store', 'name address phone code')
+      .populate('soldBy', 'name role')
+      .populate('customerUser', 'name email phone role avatar')
       .sort({ createdAt: -1 })
       .lean();
   }

@@ -313,6 +313,10 @@ export class InventoryService {
     const sessionOpts = useTransaction && session ? { session } : {};
 
     try {
+      if (!Types.ObjectId.isValid(productId)) {
+        throw new ValidationError('Invalid product ID');
+      }
+
       const product = await ProductModel.findById(productId, null, sessionOpts);
       if (!product) {
         throw new NotFoundError('Product not found', 'PRODUCT_NOT_FOUND');
@@ -323,14 +327,17 @@ export class InventoryService {
         throw new ValidationError('Invalid expiry date');
       }
 
+      const safeSupplier = supplier && Types.ObjectId.isValid(supplier) ? new Types.ObjectId(supplier) : null;
+      const safeUserId = userId && Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
+
       const batch = await BatchModel.findOneAndUpdate(
         { product: productId, batchNumber: batchNumber.trim() },
         {
           $inc: { quantity: Number(quantity) },
           $set: {
             expiryDate: expDate,
-            costPrice: Number(costPrice),
-            supplier: supplier ? new Types.ObjectId(supplier) : undefined,
+            costPrice: Number(costPrice) || 0,
+            supplier: safeSupplier,
             isActive: true,
           },
           $setOnInsert: {
@@ -347,10 +354,10 @@ export class InventoryService {
           type: 'PURCHASE' as LedgerType,
           quantity: Number(quantity),
           baseQtyNeeded: Number(quantity),
-          unitSold: product.baseUnit || 'pcs',
+          unitSold: product.baseUnit || product.unitType || 'pcs',
           balanceAfter: batch.quantity,
           referenceId: purchaseReferenceId,
-          performedBy: userId ? new Types.ObjectId(userId) : undefined,
+          performedBy: safeUserId,
         },
       ];
 
@@ -363,13 +370,43 @@ export class InventoryService {
         ledgerEntry = created;
       }
 
-      await ProductModel.findByIdAndUpdate(
-        productId,
-        {
-          $inc: { stockCached: Number(quantity) },
-        },
-        sessionOpts
-      );
+      const costNum = Number(costPrice) || 0;
+      if (costNum > 0) {
+        const updatedPackaging = Array.isArray(product.packaging)
+          ? product.packaging.map((pkg: any) => ({
+              ...pkg,
+              buyingPrice: costNum * (pkg.baseUnitQty || 1),
+            }))
+          : [];
+
+        const updatedUnitPrices = Array.isArray(product.unitPrices)
+          ? product.unitPrices.map((up: any) => ({
+              ...up,
+              buyingPrice: costNum * (up.multiplier || 1),
+            }))
+          : [];
+
+        await ProductModel.findByIdAndUpdate(
+          productId,
+          {
+            $inc: { stockCached: Number(quantity), stock: Number(quantity) },
+            $set: {
+              buyingPrice: costNum,
+              ...(updatedPackaging.length > 0 ? { packaging: updatedPackaging } : {}),
+              ...(updatedUnitPrices.length > 0 ? { unitPrices: updatedUnitPrices } : {}),
+            },
+          },
+          sessionOpts
+        );
+      } else {
+        await ProductModel.findByIdAndUpdate(
+          productId,
+          {
+            $inc: { stockCached: Number(quantity), stock: Number(quantity) },
+          },
+          sessionOpts
+        );
+      }
 
       if (useTransaction && session && !passedSession) {
         await session.commitTransaction();
@@ -405,6 +442,13 @@ export class InventoryService {
     referenceId?: string,
     userId?: string
   ) {
+    if (!Types.ObjectId.isValid(productId)) {
+      throw new ValidationError('Invalid product ID');
+    }
+    if (!Types.ObjectId.isValid(batchId)) {
+      throw new ValidationError('Invalid batch ID');
+    }
+
     const product = await ProductModel.findById(productId);
     if (!product) {
       throw new NotFoundError('Product not found', 'PRODUCT_NOT_FOUND');
@@ -431,6 +475,8 @@ export class InventoryService {
       { new: true }
     );
 
+    const safeUserId = userId && Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
+
     const [ledgerEntry] = await StockLedgerModel.create([
       {
         product: productId,
@@ -438,15 +484,15 @@ export class InventoryService {
         type,
         quantity: quantityDelta,
         baseQtyNeeded: Math.abs(quantityDelta),
-        unitSold: product.baseUnit || 'pcs',
+        unitSold: product.baseUnit || product.unitType || 'pcs',
         balanceAfter: updatedBatch.quantity,
         referenceId,
-        performedBy: userId ? new Types.ObjectId(userId) : undefined,
+        performedBy: safeUserId,
       },
     ]);
 
     await ProductModel.findByIdAndUpdate(productId, {
-      $inc: { stockCached: quantityDelta },
+      $inc: { stockCached: quantityDelta, stock: quantityDelta },
     });
 
     await deleteRedisCachePattern('cache:products:*');
@@ -459,7 +505,126 @@ export class InventoryService {
   }
 
   /**
-   * Admin Repair Utility: Re-sum all active unexpired Batch quantities and repair Product.stockCached.
+   * Edit Batch details (Batch number, Expiry Date, Quantity, Cost Price, Status).
+   */
+  async updateBatch(
+    batchId: string,
+    updateData: {
+      batchNumber?: string;
+      expiryDate?: string;
+      quantity?: number;
+      costPrice?: number;
+      isActive?: boolean;
+    },
+    userId?: string
+  ) {
+    if (!Types.ObjectId.isValid(batchId)) {
+      throw new ValidationError('Invalid batch ID');
+    }
+
+    const existingBatch = await BatchModel.findById(batchId);
+    if (!existingBatch) {
+      throw new NotFoundError('Batch not found', 'BATCH_NOT_FOUND');
+    }
+
+    const updateSet: any = {};
+    if (updateData.batchNumber && updateData.batchNumber.trim()) {
+      updateSet.batchNumber = updateData.batchNumber.trim();
+    }
+    if (updateData.expiryDate) {
+      const exp = new Date(updateData.expiryDate);
+      if (!isNaN(exp.getTime())) {
+        updateSet.expiryDate = exp;
+      }
+    }
+    if (updateData.costPrice !== undefined) {
+      updateSet.costPrice = Math.max(0, Number(updateData.costPrice));
+    }
+    if (updateData.isActive !== undefined) {
+      updateSet.isActive = Boolean(updateData.isActive);
+    }
+
+    let qtyDelta = 0;
+    if (updateData.quantity !== undefined && updateData.quantity !== existingBatch.quantity) {
+      const newQty = Math.max(0, Number(updateData.quantity));
+      qtyDelta = newQty - existingBatch.quantity;
+      updateSet.quantity = newQty;
+      updateSet.isActive = newQty > 0;
+    }
+
+    const updatedBatch = await BatchModel.findByIdAndUpdate(
+      batchId,
+      { $set: updateSet },
+      { new: true }
+    );
+
+    if (qtyDelta !== 0) {
+      const safeUserId = userId && Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
+      await StockLedgerModel.create([
+        {
+          product: existingBatch.product,
+          batch: batchId,
+          type: 'ADJUSTMENT' as LedgerType,
+          quantity: qtyDelta,
+          baseQtyNeeded: Math.abs(qtyDelta),
+          unitSold: 'pcs',
+          balanceAfter: updatedBatch!.quantity,
+          referenceId: `BATCH_EDIT_${existingBatch.batchNumber}`,
+          performedBy: safeUserId,
+        },
+      ]);
+
+      await ProductModel.findByIdAndUpdate(existingBatch.product, {
+        $inc: { stockCached: qtyDelta, stock: qtyDelta },
+      });
+    }
+
+    await deleteRedisCachePattern('cache:products:*');
+
+    return updatedBatch;
+  }
+
+  /**
+   * Delete Batch and recalculate product stock balance.
+   */
+  async deleteBatch(batchId: string, userId?: string) {
+    if (!Types.ObjectId.isValid(batchId)) {
+      throw new ValidationError('Invalid batch ID');
+    }
+
+    const batch = await BatchModel.findById(batchId);
+    if (!batch) {
+      throw new NotFoundError('Batch not found', 'BATCH_NOT_FOUND');
+    }
+
+    const productId = batch.product;
+    const remainingQty = batch.quantity;
+
+    await BatchModel.findByIdAndDelete(batchId);
+
+    if (remainingQty > 0) {
+      const safeUserId = userId && Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
+      await StockLedgerModel.create([
+        {
+          product: productId,
+          batch: batchId,
+          type: 'ADJUSTMENT' as LedgerType,
+          quantity: -remainingQty,
+          baseQtyNeeded: remainingQty,
+          unitSold: 'pcs',
+          balanceAfter: 0,
+          referenceId: `BATCH_DELETE_${batch.batchNumber}`,
+          performedBy: safeUserId,
+        },
+      ]);
+    }
+
+    await this.recalculateStock(productId.toString());
+    return { success: true, message: `Batch ${batch.batchNumber} deleted successfully` };
+  }
+
+  /**
+   * Admin Repair Utility: Re-sum all active unexpired Batch quantities and repair Product.stockCached and Product.stock.
    */
   async recalculateStock(productId: string) {
     const now = new Date();
@@ -474,10 +639,12 @@ export class InventoryService {
     const updatedProduct = await ProductModel.findByIdAndUpdate(
       productId,
       {
-        $set: { stockCached: realStockSum },
+        $set: { stockCached: realStockSum, stock: realStockSum },
       },
       { new: true }
     );
+
+    await deleteRedisCachePattern('cache:products:*');
 
     await deleteRedisCachePattern('cache:products:*');
 
@@ -529,12 +696,85 @@ export class InventoryService {
   }
 
   /**
+   * Get global batch summary metrics across all products (total active, expiring <90d, expired).
+   */
+  async getBatchesSummary() {
+    const now = new Date();
+    const in90Days = new Date();
+    in90Days.setDate(in90Days.getDate() + 90);
+
+    const [totalBatches, activeBatches, expiringSoon, expiredBatches] = await Promise.all([
+      BatchModel.countDocuments(),
+      BatchModel.countDocuments({ isActive: true, quantity: { $gt: 0 } }),
+      BatchModel.find({
+        isActive: true,
+        quantity: { $gt: 0 },
+        expiryDate: { $gte: now, $lte: in90Days },
+      })
+        .populate('product', 'name price baseUnit')
+        .sort({ expiryDate: 1 })
+        .limit(20)
+        .lean(),
+      BatchModel.find({
+        expiryDate: { $lt: now },
+        quantity: { $gt: 0 },
+      })
+        .populate('product', 'name price baseUnit')
+        .sort({ expiryDate: -1 })
+        .limit(20)
+        .lean(),
+    ]);
+
+    return {
+      totalBatches,
+      activeBatches,
+      expiringSoonCount: expiringSoon.length,
+      expiringSoonBatches: expiringSoon,
+      expiredCount: expiredBatches.length,
+      expiredBatches,
+    };
+  }
+
+  /**
+   * Recalculate stock across all products in the database.
+   */
+  async recalculateAllStock() {
+    const products = await ProductModel.find().select('_id name stockCached');
+    const results: any[] = [];
+    const now = new Date();
+
+    for (const prod of products) {
+      const activeBatches = await BatchModel.find({
+        product: prod._id,
+        isActive: true,
+        expiryDate: { $gte: now },
+      });
+
+      const realStockSum = activeBatches.reduce((acc, b) => acc + b.quantity, 0);
+      await ProductModel.findByIdAndUpdate(prod._id, {
+        $set: { stockCached: realStockSum, stock: realStockSum },
+      });
+      results.push({ productId: prod._id, name: prod.name, oldStock: prod.stockCached, newStock: realStockSum });
+    }
+
+    await deleteRedisCachePattern('cache:products:*');
+
+    return {
+      totalUpdated: results.length,
+      details: results,
+    };
+  }
+
+  /**
    * Get stock audit ledger entries for a product.
    */
-  async getLedger(productId: string, limit = 50) {
-    return StockLedgerModel.find({ product: productId })
+  async getLedger(productId?: string, limit = 50) {
+    const filter = productId ? { product: productId } : {};
+    return StockLedgerModel.find(filter)
       .sort({ createdAt: -1 })
       .limit(limit)
+      .populate('product', 'name slug price baseUnit')
+      .populate('batch', 'batchNumber expiryDate')
       .populate('performedBy', 'name email role');
   }
 }

@@ -15,6 +15,13 @@ import {
   updateMe,
   updateUserStatus,
   uploadAvatar,
+  sendStaffInvitation,
+  getStaffInvitations,
+  cancelStaffInvitation,
+  getMyStaffInvitations,
+  acceptStaffInvitation,
+  declineStaffInvitation,
+  searchCustomers,
 } from './user.controller';
 import {
   addressIdParamsSchema,
@@ -88,108 +95,6 @@ router.patch('/me', authenticate, validateRequest({ body: updateProfileSchema })
  *         description: Avatar updated successfully
  */
 router.patch('/me/avatar', authenticate, upload.single('avatar'), uploadAvatar);
-
-/**
- * @openapi
- * /users:
- *   get:
- *     summary: Admin - List all registered users for table view (Lean user objects without heavy address arrays)
- *     tags: [Users Admin]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [active, blocked]
- *       - in: query
- *         name: role
- *         schema:
- *           type: string
- *           enum: [customer, admin, pharmacist]
- *     responses:
- *       200:
- *         description: List of users fetched successfully
- */
-router.get('/', authenticate, authorize('admin'), listUsers);
-
-/**
- * @openapi
- * /users/{userId}:
- *   get:
- *     summary: Admin - Get single user full details (Includes full addresses array and details)
- *     tags: [Users Admin]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: User details fetched successfully
- *       404:
- *         description: User not found
- */
-router.get(
-  '/:userId',
-  authenticate,
-  authorize('admin'),
-  validateRequest({ params: userIdParamsSchema }),
-  getUserById
-);
-
-/**
- * @openapi
- * /users/{userId}/status:
- *   patch:
- *     summary: Admin - Block or unblock a user
- *     tags: [Users Admin]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [status]
- *             properties:
- *               status:
- *                 type: string
- *                 enum: [active, blocked]
- *     responses:
- *       200:
- *         description: User status updated successfully
- */
-router.patch(
-  '/:userId/status',
-  authenticate,
-  authorize('admin'),
-  validateRequest({ params: userIdParamsSchema, body: updateUserStatusSchema }),
-  updateUserStatus
-);
 
 /**
  * @openapi
@@ -288,5 +193,126 @@ router.patch(
  *         description: Address removed successfully
  */
 router.delete('/me/addresses/:addressId', authenticate, validateRequest({ params: addressIdParamsSchema }), removeAddress);
+
+// ==========================================
+// Specific Static Endpoints (MUST come before /:userId wildcard)
+// ==========================================
+
+// Customer autocomplete search for POS counter & staff assignment
+router.get(
+  '/customer-search',
+  authenticate,
+  authorize('admin', 'super_admin', 'sales_staff', 'pharmacist', 'inventory_manager'),
+  searchCustomers
+);
+
+// Staff Promotion & Invitation System
+router.post(
+  '/staff-invitations',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  sendStaffInvitation
+);
+
+router.get(
+  '/staff-invitations',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  getStaffInvitations
+);
+
+router.delete(
+  '/staff-invitations/:invitationId',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  cancelStaffInvitation
+);
+
+// Customer self-service endpoints for pending staff invitations
+router.get(
+  '/me/staff-invitations',
+  authenticate,
+  getMyStaffInvitations
+);
+
+router.post(
+  '/me/staff-invitations/:invitationId/accept',
+  authenticate,
+  acceptStaffInvitation
+);
+
+router.post(
+  '/me/staff-invitations/:invitationId/decline',
+  authenticate,
+  declineStaffInvitation
+);
+
+/**
+ * @openapi
+ * /users:
+ *   get:
+ *     summary: Admin - List all registered users for table view
+ *     tags: [Users Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of users fetched successfully
+ */
+router.get('/', authenticate, authorize('admin'), listUsers);
+
+/**
+ * @openapi
+ * /users/{userId}:
+ *   get:
+ *     summary: Admin - Get single user full details
+ *     tags: [Users Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User details fetched successfully
+ *       404:
+ *         description: User not found
+ */
+router.get(
+  '/:userId',
+  authenticate,
+  authorize('admin'),
+  validateRequest({ params: userIdParamsSchema }),
+  getUserById
+);
+
+/**
+ * @openapi
+ * /users/{userId}/status:
+ *   patch:
+ *     summary: Admin - Block or unblock a user
+ *     tags: [Users Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User status updated successfully
+ */
+router.patch(
+  '/:userId/status',
+  authenticate,
+  authorize('admin'),
+  validateRequest({ params: userIdParamsSchema, body: updateUserStatusSchema }),
+  updateUserStatus
+);
 
 export default router;

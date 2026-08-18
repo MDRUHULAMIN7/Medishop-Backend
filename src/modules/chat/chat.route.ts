@@ -17,10 +17,10 @@ router.get('/conversation', asyncHandler(getMyConversation));
 router.get('/messages/:conversationId', asyncHandler(getMessages));
 router.post('/messages', asyncHandler(sendMessage));
 
-// Admin & Pharmacist routes
+// Admin, Pharmacist & Sales Staff routes
 router.get(
   '/admin/conversations',
-  authorize('admin', 'super_admin', 'pharmacist', 'pharmacist_verifier'),
+  authorize('admin', 'super_admin', 'pharmacist', 'pharmacist_verifier', 'sales_staff', 'order_manager'),
   asyncHandler(getAdminConversations)
 );
 

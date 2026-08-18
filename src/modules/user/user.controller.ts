@@ -81,3 +81,54 @@ export const setDefaultAddress = asyncHandler(async (req: Request, res: Response
   const user = await userService.setDefaultAddress(req.user!.id, req.params.addressId);
   return ApiResponse.success(res, 'Default address set successfully', user);
 });
+
+// Staff Invitation Handlers
+export const sendStaffInvitation = asyncHandler(async (req: Request, res: Response) => {
+  const invitation = await userService.sendStaffInvitation(req.user!.id, req.body);
+  return ApiResponse.success(
+    res,
+    `Staff invitation sent successfully to ${invitation.recipientName || 'user'}`,
+    invitation,
+    HTTP_STATUS.CREATED
+  );
+});
+
+export const getStaffInvitations = asyncHandler(async (req: Request, res: Response) => {
+  const status = req.query.status as string | undefined;
+  const page = parseInt(req.query.page as string, 10) || 1;
+  const limit = parseInt(req.query.limit as string, 10) || 50;
+  const result = await userService.getStaffInvitations({ status, page, limit });
+  return ApiResponse.success(res, 'Staff invitations fetched successfully', result.invitations, HTTP_STATUS.OK, {
+    total: result.total,
+    page: result.page,
+    limit: result.limit,
+    pages: result.pages,
+  });
+});
+
+export const cancelStaffInvitation = asyncHandler(async (req: Request, res: Response) => {
+  const invitation = await userService.cancelStaffInvitation(req.params.invitationId);
+  return ApiResponse.success(res, 'Staff invitation cancelled successfully', invitation);
+});
+
+export const getMyStaffInvitations = asyncHandler(async (req: Request, res: Response) => {
+  const invitations = await userService.getMyStaffInvitations(req.user!.id);
+  return ApiResponse.success(res, 'Pending staff invitations fetched successfully', invitations);
+});
+
+export const acceptStaffInvitation = asyncHandler(async (req: Request, res: Response) => {
+  const result = await userService.acceptStaffInvitation(req.user!.id, req.params.invitationId);
+  return ApiResponse.success(res, result.message, result, HTTP_STATUS.OK);
+});
+
+export const declineStaffInvitation = asyncHandler(async (req: Request, res: Response) => {
+  const result = await userService.declineStaffInvitation(req.user!.id, req.params.invitationId);
+  return ApiResponse.success(res, 'Staff invitation declined', result);
+});
+
+export const searchCustomers = asyncHandler(async (req: Request, res: Response) => {
+  const query = req.query.q as string || '';
+  const customers = await userService.searchCustomers(query);
+  return ApiResponse.success(res, 'Customers fetched successfully', customers);
+});
+

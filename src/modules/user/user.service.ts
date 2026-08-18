@@ -1,6 +1,9 @@
 import { ConflictError, NotFoundError, ValidationError } from '../../utils/AppError';
 import { userRepository } from './user.repository';
 import { authRepository } from '../auth/auth.repository';
+import { UserModel } from './user.model';
+import { StaffInvitationModel } from './staffInvitation.model';
+import { createAccessToken, createRefreshToken, generateSessionId } from '../auth/auth.utils';
 import {
   CreateAddressInput,
   CreateUserInput,
@@ -282,6 +285,218 @@ export class UserService {
 
     const updatedUser = await user.save();
     return userRepository.toPublicUser(updatedUser, true);
+  }
+
+  // ==================== Staff Invitation & Promotion System ====================
+
+  async sendStaffInvitation(
+    senderId: string,
+    input: { identifier: string; targetRole: string; notes?: string }
+  ) {
+    const rawIdentifier = input.identifier.trim();
+    let recipient: any = null;
+
+    // Search by email, phone, or ObjectId
+    if (rawIdentifier.includes('@')) {
+      recipient = await userRepository.findByEmail(rawIdentifier.toLowerCase());
+    } else if (rawIdentifier.startsWith('01') || rawIdentifier.startsWith('+88') || rawIdentifier.startsWith('88')) {
+      recipient = await userRepository.findByPhone(normalizePhone(rawIdentifier));
+    } else {
+      try {
+        recipient = await userRepository.findById(rawIdentifier);
+      } catch {
+        recipient = null;
+      }
+    }
+
+    if (!recipient) {
+      recipient = await UserModel.findOne({
+        $or: [
+          { email: rawIdentifier.toLowerCase() },
+          { phone: normalizePhone(rawIdentifier) },
+          { name: new RegExp(`^${rawIdentifier}$`, 'i') },
+        ],
+      });
+    }
+
+    if (!recipient) {
+      throw new NotFoundError(
+        `User "${rawIdentifier}" not found. Please ensure the user has already registered an account.`,
+        'USER_NOT_FOUND'
+      );
+    }
+
+    if (recipient.role === input.targetRole) {
+      throw new ValidationError(
+        `User "${recipient.name}" already has the role "${input.targetRole}".`
+      );
+    }
+
+    // Cancel any existing pending invitation for this recipient
+    await StaffInvitationModel.updateMany(
+      { recipient: recipient._id, status: 'pending' },
+      { $set: { status: 'cancelled' } }
+    );
+
+    const invitation = await StaffInvitationModel.create({
+      sender: senderId,
+      recipient: recipient._id,
+      recipientEmail: recipient.email || undefined,
+      recipientPhone: recipient.phone || undefined,
+      recipientName: recipient.name,
+      targetRole: input.targetRole,
+      notes: input.notes,
+      status: 'pending',
+    });
+
+    const populated = await StaffInvitationModel.findById(invitation._id)
+      .populate('sender', 'name email role')
+      .populate('recipient', 'name email phone role');
+
+    return populated;
+  }
+
+  async getStaffInvitations(query: { status?: string; page?: number; limit?: number }) {
+    const filter: any = {};
+    if (query.status && query.status !== 'all') {
+      filter.status = query.status;
+    }
+
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(100, Math.max(1, query.limit || 50));
+    const skip = (page - 1) * limit;
+
+    const [invitations, total] = await Promise.all([
+      StaffInvitationModel.find(filter)
+        .populate('sender', 'name email role')
+        .populate('recipient', 'name email phone role')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      StaffInvitationModel.countDocuments(filter),
+    ]);
+
+    return { invitations, total, page, limit, pages: Math.ceil(total / limit) };
+  }
+
+  async cancelStaffInvitation(invitationId: string) {
+    const invitation = await StaffInvitationModel.findById(invitationId);
+    if (!invitation) {
+      throw new NotFoundError('Staff invitation not found', 'INVITATION_NOT_FOUND');
+    }
+
+    invitation.status = 'cancelled';
+    await invitation.save();
+    return invitation;
+  }
+
+  async getMyStaffInvitations(userId: string) {
+    const user = (await UserModel.findById(userId).lean()) as any;
+    const userEmail = user?.email?.toLowerCase();
+    const userPhone = user?.phone;
+
+    const filter: any = {
+      status: 'pending',
+      $or: [
+        { recipient: userId },
+        ...(userEmail ? [{ recipientEmail: userEmail }] : []),
+        ...(userPhone ? [{ recipientPhone: userPhone }] : []),
+      ],
+    };
+
+    return StaffInvitationModel.find(filter)
+      .populate('sender', 'name email role')
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  async acceptStaffInvitation(userId: string, invitationId: string) {
+    const user = await userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User account not found', 'USER_NOT_FOUND');
+    }
+
+    const invitation = await StaffInvitationModel.findOne({
+      _id: invitationId,
+      status: 'pending',
+      $or: [
+        { recipient: userId },
+        ...(user.email ? [{ recipientEmail: user.email.toLowerCase() }] : []),
+        ...(user.phone ? [{ recipientPhone: user.phone }] : []),
+      ],
+    });
+
+    if (!invitation) {
+      throw new NotFoundError('Pending staff invitation not found', 'INVITATION_NOT_FOUND');
+    }
+
+    // Update user role
+    user.role = invitation.targetRole as UserRole;
+    await user.save();
+
+    // Mark invitation accepted
+    invitation.recipient = user._id;
+    invitation.status = 'accepted';
+    invitation.respondedAt = new Date();
+    await invitation.save();
+
+    // Issue refreshed session tokens with new role
+    const sessionId = generateSessionId();
+    const accessToken = createAccessToken(user._id.toString(), user.role, sessionId);
+    const refreshToken = createRefreshToken(user._id.toString(), user.role, sessionId);
+    await authRepository.storeRefreshSession(user._id.toString(), sessionId, refreshToken);
+
+    return {
+      user: userRepository.toPublicUser(user, true),
+      accessToken,
+      refreshToken,
+      message: `Congratulations! Your role has been updated to ${invitation.targetRole}.`,
+    };
+  }
+
+  async declineStaffInvitation(userId: string, invitationId: string) {
+    const user = (await UserModel.findById(userId).lean()) as any;
+    const invitation = await StaffInvitationModel.findOne({
+      _id: invitationId,
+      status: 'pending',
+      $or: [
+        { recipient: userId },
+        ...(user?.email ? [{ recipientEmail: user.email.toLowerCase() }] : []),
+        ...(user?.phone ? [{ recipientPhone: user.phone }] : []),
+      ],
+    });
+
+    if (!invitation) {
+      throw new NotFoundError('Pending staff invitation not found', 'INVITATION_NOT_FOUND');
+    }
+
+    invitation.status = 'declined';
+    invitation.respondedAt = new Date();
+    await invitation.save();
+
+    return { declined: true };
+  }
+
+  async searchCustomers(query: string) {
+    if (!query || query.trim().length === 0) {
+      return UserModel.find({ status: 'active' })
+        .select('name email phone role avatar addresses createdAt')
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean();
+    }
+
+    const clean = query.trim();
+    const regex = new RegExp(clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+    return UserModel.find({
+      status: 'active',
+      $or: [{ name: regex }, { email: regex }, { phone: regex }],
+    })
+      .select('name email phone role avatar addresses createdAt')
+      .limit(20)
+      .lean();
   }
 
   toPublicUser(user: any, includeAddresses = false): PublicUser {

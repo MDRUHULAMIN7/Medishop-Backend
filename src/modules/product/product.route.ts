@@ -225,7 +225,7 @@ router.get('/:idOrSlug', validateRequest({ params: productIdOrSlugSchema }), get
 router.post(
   '/',
   authenticate,
-  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist'),
+  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist', 'sales_staff'),
   upload.array('images', 5),
   validateRequest({ body: createProductSchema }),
   createProduct
@@ -252,7 +252,7 @@ router.post(
 router.patch(
   '/:id',
   authenticate,
-  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist'),
+  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist', 'sales_staff'),
   upload.array('images', 5),
   validateRequest({ params: productIdSchema, body: updateProductSchema }),
   updateProduct
@@ -279,7 +279,7 @@ router.patch(
 router.patch(
   '/:id/toggle-feature',
   authenticate,
-  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist'),
+  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist', 'sales_staff'),
   validateRequest({ params: productIdSchema }),
   toggleFeaturedProduct
 );
@@ -305,7 +305,7 @@ router.patch(
 router.delete(
   '/:id',
   authenticate,
-  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist'),
+  authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist', 'sales_staff'),
   validateRequest({ params: productIdSchema }),
   deleteProduct
 );

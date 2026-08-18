@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { HTTP_STATUS } from '../../config/constants';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { asyncHandler } from '../../utils/asyncHandler';
+import { UserModel } from '../user/user.model';
 import { posService } from './pos.service';
 
 // Store Handlers
@@ -52,3 +53,17 @@ export const voidPosSale = asyncHandler(async (req: Request, res: Response) => {
   const sale = await posService.voidPosSale(req.user!.id, req.params.invoiceNumber, req.body.reason || 'Customer request');
   return ApiResponse.success(res, `Invoice ${sale.invoiceNumber} voided and stock restored successfully`, sale);
 });
+
+export const getTodayStats = asyncHandler(async (req: Request, res: Response) => {
+  const staffId = req.user?.id;
+  const stats = await posService.getTodayStats(staffId);
+  return ApiResponse.success(res, "Today's sales statistics fetched successfully", stats);
+});
+
+export const getMyCustomerPurchases = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const user = (await UserModel.findById(userId).select('phone email').lean()) as any;
+  const sales = await posService.getCustomerPurchases(userId, user?.phone, user?.email);
+  return ApiResponse.success(res, 'Customer POS counter purchases fetched successfully', sales);
+});
+
