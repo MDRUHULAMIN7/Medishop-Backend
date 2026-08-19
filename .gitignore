@@ -7,6 +7,9 @@ node_modules/
 dist/
 build/
 
+# Local model cache (downloaded at runtime)
+.cache/
+
 # Environment files
 .env
 .env.local

@@ -22,16 +22,17 @@ app.use(
       // Allow requests with no origin (like mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
 
-      const configuredUrls = config.CLIENT_URL.split(',').map((u) => u.trim());
+      const configuredUrls = config.CLIENT_URL.split(',').map((u) => u.trim()).filter(Boolean);
       const isAllowed =
         configuredUrls.includes(origin) ||
-        origin.includes('localhost') ||
-        origin.endsWith('.vercel.app');
+        /^https?:\/\/localhost(?::\d+)?$/.test(origin) ||
+        /^https?:\/\/127\.0\.0\.1(?::\d+)?$/.test(origin) ||
+        /^https?:\/\/192\.168\.0\.100(?::\d+)?$/.test(origin) ||
+        /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin);
 
-      if (isAllowed) {
-        return callback(null, true);
-      }
-      return callback(null, true); // Permissive in production to avoid frontend connection block
+      return isAllowed
+        ? callback(null, true)
+        : callback(new Error(`CORS origin not allowed: ${origin}`));
     },
     credentials: true,
   })

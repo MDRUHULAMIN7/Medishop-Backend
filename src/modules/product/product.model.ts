@@ -17,6 +17,17 @@ const DOSAGE_FORMS = [
 
 const UNIT_TYPES = ['pcs', 'strip', 'box', 'bottle', 'tube', 'gm', 'ml', 'pack'];
 
+const recognitionImageSchema = new Schema(
+  {
+    imageUrl: { type: String, required: true, trim: true },
+    imageHash: { type: String, trim: true },
+    embedding: { type: [Number], required: true },
+    embeddingModel: { type: String, required: true, trim: true },
+    generatedAt: { type: Date, required: true, default: Date.now },
+  },
+  { _id: false }
+);
+
 const productSchema = new Schema<IProduct>(
   {
     name: { type: String, required: true, trim: true },
@@ -85,6 +96,8 @@ const productSchema = new Schema<IProduct>(
     expiryDate: { type: Date, default: null },
     batchNumber: { type: String, trim: true },
     images: { type: [String], default: [] },
+    // Vector data is internal recognition data and must never be returned by default.
+    recognitionImages: { type: [recognitionImageSchema], default: [], select: false },
     requiresPrescription: { type: Boolean, default: false, index: true },
     isFeatured: { type: Boolean, default: false, index: true },
     isActive: { type: Boolean, default: true, index: true },

@@ -3,6 +3,12 @@ import { z } from 'zod';
 
 dotenv.config();
 
+const boundedNumber = (fallback: number, minimum: number, maximum: number) => (value: string) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(maximum, Math.max(minimum, parsed));
+};
+
 const envSchema = z.object({
   PORT: z.string().default('5000').transform((val) => parseInt(val, 10)),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -34,6 +40,12 @@ const envSchema = z.object({
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
   SMTP_FROM: z.string().default('no-reply@medishop.com'),
+  PRODUCT_RECOGNITION_PROVIDER: z.literal('local_clip').default('local_clip'),
+  PRODUCT_RECOGNITION_MODEL: z.string().default('Xenova/clip-vit-base-patch32'),
+  PRODUCT_RECOGNITION_TOP_K: z.string().default('3').transform(boundedNumber(3, 1, 10)),
+  PRODUCT_RECOGNITION_MIN_SIMILARITY: z.string().default('0.72').transform(boundedNumber(0.72, 0, 1)),
+  PRODUCT_RECOGNITION_DTYPE: z.enum(['q8', 'fp32']).default('q8'),
+  PRODUCT_RECOGNITION_CACHE_DIR: z.string().default('./.cache/medishop-clip'),
 });
 
 const _env = envSchema.safeParse(process.env);

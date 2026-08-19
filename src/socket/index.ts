@@ -3,6 +3,8 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { verifyJwt } from '../utils/jwt';
 import { config } from '../config/env';
 import { AuthUser } from '../modules/auth/auth.types';
+import { UserModel } from '../modules/user/user.model';
+import { scannerSessionService } from '../modules/pos/scanner/scanner.service';
 
 let io: SocketIOServer | null = null;
 
@@ -17,19 +19,36 @@ export const initSocket = (httpServer: HttpServer): SocketIOServer => {
     },
   });
 
-  // Socket Middleware: JWT Authenticate Connection
-  io.use((socket: Socket, next) => {
+  // Socket Middleware: JWT for staff/desktop sockets, short-lived scanner token for paired phones.
+  io.use(async (socket: Socket, next) => {
     const token =
       socket.handshake.auth?.token ||
       socket.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
 
-    if (!token) {
-      return next(new Error('Authentication token required'));
-    }
-
     try {
-      const decoded = verifyJwt<AuthUser>(token, config.JWT_ACCESS_SECRET);
-      socket.data.user = decoded;
+      if (token) {
+        const decoded = verifyJwt<AuthUser>(token, config.JWT_ACCESS_SECRET);
+        const user: any = await UserModel.findById(decoded.id).select('status role').lean();
+        if (!user || user.status === 'blocked') return next(new Error('POS account is unavailable'));
+        socket.data.user = { ...decoded, role: user.role || decoded.role };
+        return next();
+      }
+
+      const scannerSessionId = socket.handshake.auth?.scannerSessionId;
+      const scannerToken = socket.handshake.auth?.scannerToken;
+      if (!scannerSessionId || !scannerToken) return next(new Error('Authentication token required'));
+
+      const session = await scannerSessionService.authorize(scannerSessionId, scannerToken);
+      const user: any = await UserModel.findById(session.posUserId).select('status role').lean();
+      if (!user || user.status === 'blocked') return next(new Error('POS account is unavailable'));
+
+      socket.data.user = {
+        id: session.posUserId.toString(),
+        role: user.role,
+        sessionId: `scanner:${session.sessionId}`,
+      } as AuthUser;
+      socket.data.scannerSession = session;
+      socket.data.scannerToken = scannerToken;
       return next();
     } catch {
       return next(new Error('Invalid or expired socket token'));
@@ -38,9 +57,11 @@ export const initSocket = (httpServer: HttpServer): SocketIOServer => {
 
   io.on('connection', (socket: Socket) => {
     const user = socket.data.user as AuthUser;
-    const isAdmin = Boolean(user?.role && user.role !== 'customer');
+    const scannerSession = socket.data.scannerSession as { sessionId: string } | undefined;
+    const isRemoteScanner = Boolean(scannerSession);
+    const isAdmin = Boolean(!isRemoteScanner && user?.role && user.role !== 'customer');
 
-    if (user?.id) {
+    if (user?.id && !isRemoteScanner) {
       // Auto-join user to their user room
       socket.join(`user:${user.id}`);
 
@@ -48,6 +69,58 @@ export const initSocket = (httpServer: HttpServer): SocketIOServer => {
       if (isAdmin) {
         socket.join('admins');
       }
+    }
+
+    socket.on('pos:scanner:join', async (data: { sessionId?: string; role?: 'desktop' | 'phone' }) => {
+      const sessionId = data?.sessionId;
+      if (!sessionId) return socket.emit('pos:scanner:error', { message: 'Scanner session ID is required' });
+
+      try {
+        if (scannerSession) {
+          if (scannerSession.sessionId !== sessionId) throw new Error('Scanner session mismatch');
+          await scannerSessionService.authorize(sessionId, socket.data.scannerToken);
+        } else {
+          await scannerSessionService.authorize(sessionId, undefined, user.id);
+        }
+
+        socket.join(`pos-scanner:${sessionId}`);
+        await scannerSessionService.markConnected(sessionId);
+        io?.to(`pos-scanner:${sessionId}`).emit('pos:scanner:connected', {
+          sessionId,
+          role: data?.role || (scannerSession ? 'phone' : 'desktop'),
+        });
+      } catch {
+        socket.emit('pos:scanner:error', { sessionId, message: 'Unable to join scanner session' });
+      }
+    });
+
+    socket.on('pos:scanner:captured', async (data: { sessionId?: string }) => {
+      const sessionId = data?.sessionId;
+      if (!sessionId || !scannerSession || scannerSession.sessionId !== sessionId) return;
+      try {
+        await scannerSessionService.authorize(sessionId, socket.data.scannerToken);
+        await scannerSessionService.touch(sessionId);
+        io?.to(`pos-scanner:${sessionId}`).emit('pos:scanner:captured', { sessionId });
+      } catch {
+        socket.emit('pos:scanner:error', { sessionId, message: 'Scanner session expired' });
+      }
+    });
+
+    socket.on('pos:scanner:leave', (data: { sessionId?: string }) => {
+      const sessionId = data?.sessionId;
+      if (!sessionId) return;
+      socket.leave(`pos-scanner:${sessionId}`);
+      io?.to(`pos-scanner:${sessionId}`).emit('pos:scanner:disconnect', { sessionId });
+    });
+
+    // A paired phone may only use scanner events. It must not inherit staff/admin chat rooms.
+    if (isRemoteScanner) {
+      socket.on('disconnect', () => {
+        io?.to(`pos-scanner:${scannerSession!.sessionId}`).emit('pos:scanner:disconnect', {
+          sessionId: scannerSession!.sessionId,
+        });
+      });
+      return;
     }
 
     socket.on('join:admins', () => {

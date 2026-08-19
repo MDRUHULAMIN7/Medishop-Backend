@@ -18,6 +18,9 @@ const toResponse = (category: any) => ({
   updatedAt: category.updatedAt,
 });
 
+const isObjectIdLike = (value: string): boolean =>
+  Types.ObjectId.isValid(value) && /^[0-9a-fA-F]{24}$/.test(value);
+
 export class CategoryRepository {
   async findAll(onlyActive = true) {
     const filter = onlyActive ? { isActive: true } : {};
@@ -32,18 +35,28 @@ export class CategoryRepository {
   }
 
   async findByIdOrSlug(idOrSlug: string) {
-    const isValidId = Types.ObjectId.isValid(idOrSlug) && /^[0-9a-fA-F]{24}$/.test(idOrSlug);
+    const normalizedValue = idOrSlug.trim();
+    const isValidId = isObjectIdLike(normalizedValue);
     let category = null;
     if (isValidId) {
-      category = await CategoryModel.findById(idOrSlug).lean();
+      category = await CategoryModel.findById(normalizedValue).lean();
     }
+
+    // Some existing category records were imported with string `_id` values.
+    // Mongoose casts 24-character strings to ObjectId, so findById cannot see
+    // those records. The native collection lookup preserves compatibility
+    // without changing the current Category schema or existing ObjectIds.
+    if (!category) {
+      category = await CategoryModel.collection.findOne({ _id: normalizedValue } as any);
+    }
+
     if (!category) {
       category = await CategoryModel.findOne({
         $or: [
-          { slug: idOrSlug.toLowerCase() },
-          { name: idOrSlug },
-          { nameBn: idOrSlug },
-          { nameEn: idOrSlug },
+          { slug: normalizedValue.toLowerCase() },
+          { name: normalizedValue },
+          { nameBn: normalizedValue },
+          { nameEn: normalizedValue },
         ],
       }).lean();
     }
@@ -51,7 +64,16 @@ export class CategoryRepository {
   }
 
   async findRawById(id: string) {
-    return CategoryModel.findById(id);
+    const normalizedId = id.trim();
+    if (!normalizedId) return null;
+
+    if (isObjectIdLike(normalizedId)) {
+      const category = await CategoryModel.findById(normalizedId);
+      if (category) return category;
+    }
+
+    // See findByIdOrSlug: support legacy string category identifiers.
+    return CategoryModel.collection.findOne({ _id: normalizedId } as any);
   }
 
   async findRawBySlug(slug: string) {
@@ -72,15 +94,34 @@ export class CategoryRepository {
       updatePayload.parentCategory = data.parentCategory ? new Types.ObjectId(data.parentCategory) : null;
     }
 
-    const updated = await CategoryModel.findByIdAndUpdate(id, updatePayload, {
-      new: true,
-      runValidators: true,
-    }).lean();
+    const existing = await this.findRawById(id);
+    if (!existing) return null;
+
+    let updated: any;
+    if (typeof (existing as any)._id === 'string') {
+      await CategoryModel.collection.updateOne(
+        { _id: (existing as any)._id },
+        { $set: { ...updatePayload, updatedAt: new Date() } },
+      );
+      updated = await CategoryModel.collection.findOne({ _id: (existing as any)._id });
+    } else {
+      updated = await CategoryModel.findByIdAndUpdate(id, updatePayload, {
+        new: true,
+        runValidators: true,
+      }).lean();
+    }
 
     return updated ? toResponse(updated) : null;
   }
 
   async delete(id: string) {
+    const existing = await this.findRawById(id);
+    if (!existing) return null;
+
+    if (typeof (existing as any)._id === 'string') {
+      return CategoryModel.collection.deleteOne({ _id: (existing as any)._id });
+    }
+
     return CategoryModel.findByIdAndDelete(id);
   }
 

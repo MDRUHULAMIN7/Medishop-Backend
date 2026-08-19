@@ -13,6 +13,9 @@ const toResponse = (brand: any): BrandResponse => ({
   updatedAt: brand.updatedAt,
 });
 
+const isObjectIdLike = (value: string): boolean =>
+  Types.ObjectId.isValid(value) && /^[0-9a-fA-F]{24}$/.test(value);
+
 export class BrandRepository {
   async findAll(onlyActive = true) {
     const filter = onlyActive ? { isActive: true } : {};
@@ -27,18 +30,25 @@ export class BrandRepository {
   }
 
   async findByIdOrSlug(idOrSlug: string) {
-    const isValidId = Types.ObjectId.isValid(idOrSlug) && /^[0-9a-fA-F]{24}$/.test(idOrSlug);
+    const normalizedValue = idOrSlug.trim();
+    const isValidId = isObjectIdLike(normalizedValue);
     let brand = null;
     if (isValidId) {
-      brand = await BrandModel.findById(idOrSlug).lean();
+      brand = await BrandModel.findById(normalizedValue).lean();
     }
+
+    // Support legacy brand records whose imported `_id` is a string.
+    if (!brand) {
+      brand = await BrandModel.collection.findOne({ _id: normalizedValue } as any);
+    }
+
     if (!brand) {
       brand = await BrandModel.findOne({
         $or: [
-          { slug: idOrSlug.toLowerCase() },
-          { name: idOrSlug },
-          { nameBn: idOrSlug },
-          { nameEn: idOrSlug },
+          { slug: normalizedValue.toLowerCase() },
+          { name: normalizedValue },
+          { nameBn: normalizedValue },
+          { nameEn: normalizedValue },
         ],
       }).lean();
     }
@@ -46,7 +56,15 @@ export class BrandRepository {
   }
 
   async findRawById(id: string) {
-    return BrandModel.findById(id);
+    const normalizedId = id.trim();
+    if (!normalizedId) return null;
+
+    if (isObjectIdLike(normalizedId)) {
+      const brand = await BrandModel.findById(normalizedId);
+      if (brand) return brand;
+    }
+
+    return BrandModel.collection.findOne({ _id: normalizedId } as any);
   }
 
   async findRawBySlug(slug: string) {
@@ -63,15 +81,34 @@ export class BrandRepository {
   }
 
   async update(id: string, data: UpdateBrandInput) {
-    const updated = await BrandModel.findByIdAndUpdate(id, data, {
-      new: true,
-      runValidators: true,
-    }).lean();
+    const existing = await this.findRawById(id);
+    if (!existing) return null;
+
+    let updated: any;
+    if (typeof (existing as any)._id === 'string') {
+      await BrandModel.collection.updateOne(
+        { _id: (existing as any)._id },
+        { $set: { ...data, updatedAt: new Date() } },
+      );
+      updated = await BrandModel.collection.findOne({ _id: (existing as any)._id } as any);
+    } else {
+      updated = await BrandModel.findByIdAndUpdate(id, data, {
+        new: true,
+        runValidators: true,
+      }).lean();
+    }
 
     return updated ? toResponse(updated) : null;
   }
 
   async delete(id: string) {
+    const existing = await this.findRawById(id);
+    if (!existing) return null;
+
+    if (typeof (existing as any)._id === 'string') {
+      return BrandModel.collection.deleteOne({ _id: (existing as any)._id } as any);
+    }
+
     return BrandModel.findByIdAndDelete(id);
   }
 }

@@ -6,6 +6,7 @@ import { categoryRepository } from '../category/category.repository';
 import { productRepository } from './product.repository';
 import { CreateProductInput, ProductFilterQuery, SearchSuggestionItem, UpdateProductInput } from './product.types';
 import { inventoryService } from '../inventory/inventory.service';
+import { productRecognitionService } from '../product-recognition/product-recognition.service';
 
 const CACHE_KEYS = {
   LIST_PREFIX: 'cache:products:list:',
@@ -177,6 +178,16 @@ export class ProductService {
       }
     }
 
+    if (Array.isArray(input.images) && input.images.length > 0) {
+      try {
+        await productRecognitionService.rebuildProductEmbeddings(product.id, input.images);
+      } catch (err) {
+        // Recognition is an enhancement. Catalog creation remains successful if the
+        // local model or an image host is temporarily unavailable.
+        console.warn('Product recognition embedding warning on create:', (err as Error).message);
+      }
+    }
+
     await clearProductCache();
     return product;
   }
@@ -213,11 +224,26 @@ export class ProductService {
       slug = slugify(input.name);
     }
 
+    const imagesChanged = input.images !== undefined
+      && JSON.stringify(Array.isArray(existing.images) ? existing.images : [])
+        !== JSON.stringify(Array.isArray(input.images) ? input.images : []);
+
     const updated = await productRepository.update(id, {
       ...input,
       ...(input.name && { name: input.name.trim() }),
       ...(slug && { slug }),
     });
+
+    if (imagesChanged && Array.isArray(input.images)) {
+      try {
+        await productRecognitionService.rebuildProductEmbeddings(id, input.images);
+      } catch (err) {
+        console.warn('Product recognition embedding warning on update:', (err as Error).message);
+      }
+    }
+    if (imagesChanged || input.isActive !== undefined) {
+      productRecognitionService.invalidateRecognitionIndex();
+    }
 
     await clearProductCache();
     await deleteRedisCacheKeys(`${CACHE_KEYS.DETAIL_PREFIX}${existing._id.toString()}`, `${CACHE_KEYS.DETAIL_PREFIX}${existing.slug}`);
@@ -245,6 +271,7 @@ export class ProductService {
     }
 
     await productRepository.delete(id);
+    productRecognitionService.invalidateRecognitionIndex();
     await clearProductCache();
     await deleteRedisCacheKeys(`${CACHE_KEYS.DETAIL_PREFIX}${product._id.toString()}`, `${CACHE_KEYS.DETAIL_PREFIX}${product.slug}`);
     return { id, deleted: true };

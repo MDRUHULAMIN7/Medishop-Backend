@@ -10,6 +10,12 @@ declare global {
 
     interface Request {
       user?: UserContext;
+      scannerSession?: {
+        sessionId: string;
+        posUserId: any;
+        status: string;
+        expiresAt: Date;
+      };
     }
   }
 }

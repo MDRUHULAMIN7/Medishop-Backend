@@ -16,6 +16,7 @@ import {
   ChangePasswordInput,
 } from './auth.types';
 import { userService } from '../user/user.service';
+import { scannerSessionService } from '../pos/scanner/scanner.service';
 import {
   comparePassword,
   compareSha256Hash,
@@ -198,6 +199,7 @@ export class AuthService {
   async logout(refreshToken: string) {
     const decoded = verifyJwt<AuthUser>(refreshToken, config.JWT_REFRESH_SECRET);
     await authRepository.deleteRefreshSession(decoded.id, decoded.sessionId);
+    await scannerSessionService.closeAllForUser(decoded.id);
     return { loggedOut: true };
   }
 

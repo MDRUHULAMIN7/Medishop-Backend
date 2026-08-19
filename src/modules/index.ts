@@ -10,6 +10,8 @@ import inventoryRouter from './inventory/inventory.routes';
 import notificationRouter from './notification/notification.route';
 import orderRouter from './order/order.route';
 import posRouter from './pos/pos.route';
+import scannerRouter from './pos/scanner/scanner.route';
+import recognitionRouter from './product-recognition/product-recognition.route';
 import storeRouter from './pos/store.route';
 import prescriptionRouter from './prescription/prescription.route';
 import productRouter from './product/product.route';
@@ -31,6 +33,8 @@ export const registerModuleRoutes = (app: Application) => {
   app.use('/api/v1/prescriptions', prescriptionRouter);
   app.use('/api/v1/orders', orderRouter);
   app.use('/api/v1/notifications', notificationRouter);
+  app.use('/api/v1/pos/scanner', scannerRouter);
+  app.use('/api/v1/pos/recognition', recognitionRouter);
   app.use('/api/v1/pos', posRouter);
   app.use('/api/v1/admin', adminRouter);
   app.use('/api/v1/courier', courierRouter);

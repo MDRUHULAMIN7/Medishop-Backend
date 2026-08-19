@@ -40,6 +40,14 @@ export interface IPackagingUnit {
   isActive: boolean;
 }
 
+export interface IProductRecognitionImage {
+  imageUrl: string;
+  imageHash?: string;
+  embedding: number[];
+  embeddingModel: string;
+  generatedAt: Date;
+}
+
 export interface IProduct {
   _id: Types.ObjectId;
   name: string;
@@ -64,6 +72,8 @@ export interface IProduct {
   expiryDate?: Date | null;
   batchNumber?: string;
   images: string[];
+  /** Internal only. This field is excluded from public projections. */
+  recognitionImages?: IProductRecognitionImage[];
   requiresPrescription: boolean;
   isFeatured: boolean;
   isActive: boolean;
