@@ -33,7 +33,7 @@ export const normalizeIdentifier = (value: string) => {
 export const getIdentifierType = (identifier: string) => (isEmail(identifier) ? 'email' : 'phone');
 
 export const generateOtp = () => {
-  if (config.ENABLE_DEMO_OTP && config.NODE_ENV !== 'production') {
+  if (config.ENABLE_DEMO_OTP) {
     return '123456';
   }
 
@@ -70,7 +70,7 @@ export const parseDurationToMs = (value: string) => {
 export const getRefreshCookieOptions = () => ({
   httpOnly: true,
   secure: config.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
+  sameSite: (config.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
   path: '/api/v1/auth',
   maxAge: parseDurationToMs(config.JWT_REFRESH_EXPIRES_IN),
 });
@@ -105,7 +105,7 @@ export interface SendOtpNotificationInput {
 }
 
 export const sendOtpNotification = async ({ identifier, otp, targetType }: SendOtpNotificationInput) => {
-  if (config.NODE_ENV !== 'production' && config.ENABLE_DEMO_OTP) {
+  if (config.ENABLE_DEMO_OTP) {
     console.log(`[OTP DEMO] ${targetType.toUpperCase()} ${identifier} -> ${otp}`);
     return;
   }
@@ -120,20 +120,26 @@ export const sendOtpNotification = async ({ identifier, otp, targetType }: SendO
     return;
   }
 
-  const transport = nodemailer.createTransport({
-    host: config.SMTP_HOST,
-    port: config.SMTP_PORT,
-    secure: config.SMTP_PORT === 465,
-    auth: {
-      user: config.SMTP_USER,
-      pass: config.SMTP_PASS,
-    },
-  });
+  try {
+    const transport = nodemailer.createTransport({
+      host: config.SMTP_HOST,
+      port: config.SMTP_PORT,
+      secure: config.SMTP_PORT === 465,
+      auth: {
+        user: config.SMTP_USER,
+        pass: config.SMTP_PASS,
+      },
+    });
 
-  await transport.sendMail({
-    from: config.SMTP_FROM,
-    to: identifier,
-    subject: 'mediShop verification code',
-    text: `Your mediShop verification code is ${otp}. It expires in 5 minutes.`,
-  });
+    await transport.sendMail({
+      from: config.SMTP_FROM,
+      to: identifier,
+      subject: 'mediShop verification code',
+      text: `Your mediShop verification code is ${otp}. It expires in 5 minutes.`,
+    });
+  } catch (error: any) {
+    console.error('⚠️ Failed to send OTP email via SMTP:', error?.message || error);
+    // Log fallback so operations / demo accounts are not blocked
+    console.log(`[OTP FALLBACK] ${targetType.toUpperCase()} ${identifier} -> ${otp}`);
+  }
 };
