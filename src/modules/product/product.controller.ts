@@ -7,10 +7,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { productService } from './product.service';
 
 export const getProducts = asyncHandler(async (req: Request, res: Response) => {
-  const isAdminQuery = req.query.isAdmin === 'true' || (req as any).user?.role === 'admin';
-  const result = isAdminQuery
-    ? await productService.getAdminProducts(req.query as any)
-    : await productService.getProducts(req.query as any);
+  const result = await productService.getProducts(req.query as any);
   const metaObj = result.meta || {
     total: result.total,
     page: result.page,
@@ -18,6 +15,11 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
     totalPages: result.totalPages,
   };
   return ApiResponse.success(res, 'Products fetched successfully', result.products, HTTP_STATUS.OK, metaObj);
+});
+
+export const getAdminProducts = asyncHandler(async (req: Request, res: Response) => {
+  const result = await productService.getAdminProducts(req.query as any);
+  return ApiResponse.success(res, 'Admin products fetched successfully', result.products, HTTP_STATUS.OK, result.meta);
 });
 
 export const getSearchSuggestions = asyncHandler(async (req: Request, res: Response) => {
@@ -34,11 +36,13 @@ export const getFeaturedProducts = asyncHandler(async (req: Request, res: Respon
 });
 
 export const getProductByIdOrSlug = asyncHandler(async (req: Request, res: Response) => {
-  const isAdminQuery = req.query.isAdmin === 'true' || (req as any).user?.role === 'admin';
-  const product = isAdminQuery
-    ? await productService.getAdminProductByIdOrSlug(req.params.idOrSlug)
-    : await productService.getProductByIdOrSlug(req.params.idOrSlug);
+  const product = await productService.getProductByIdOrSlug(req.params.idOrSlug);
   return ApiResponse.success(res, 'Product details fetched successfully', product);
+});
+
+export const getAdminProductByIdOrSlug = asyncHandler(async (req: Request, res: Response) => {
+  const product = await productService.getAdminProductByIdOrSlug(req.params.idOrSlug);
+  return ApiResponse.success(res, 'Admin product details fetched successfully', product);
 });
 
 export const createProduct = asyncHandler(async (req: Request, res: Response) => {

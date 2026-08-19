@@ -173,6 +173,22 @@ const isValidObjectId = (val?: string): boolean => {
   return Types.ObjectId.isValid(val) && new Types.ObjectId(val).toString() === val;
 };
 
+const splitFilterValues = (value?: string): string[] =>
+  value ? value.split(',').map((item) => item.trim()).filter(Boolean) : [];
+
+const buildSort = (sort?: string): Record<string, 1 | -1> => {
+  switch (sort) {
+    case 'price-asc': return { price: 1 };
+    case 'price-desc': return { price: -1 };
+    case 'rating': return { ratingAverage: -1, ratingCount: -1 };
+    case 'newest':
+    case '-createdAt': return { createdAt: -1 };
+    case 'oldest':
+    case 'createdAt': return { createdAt: 1 };
+    default: return { createdAt: -1 };
+  }
+};
+
 export class ProductRepository {
   async findRawById(id: string) {
     if (!isValidObjectId(id)) return null;
@@ -245,6 +261,7 @@ export class ProductRepository {
       requiresPrescription,
       minPrice,
       maxPrice,
+      inStock,
       includeInactive = false,
     } = query;
 
@@ -254,30 +271,35 @@ export class ProductRepository {
       filter.isActive = true;
     }
 
-    if (category) {
-      if (isValidObjectId(category)) {
-        filter.category = new Types.ObjectId(category);
-      } else {
-        const catDoc: any = await CategoryModel.findOne({ slug: category }).lean();
-        if (catDoc) filter.category = catDoc._id;
-        else return { products: [], total: 0, page, limit, totalPages: 0 };
+    const categoryValues = splitFilterValues(category);
+    if (categoryValues.length > 0) {
+      const categoryIds = categoryValues.filter(isValidObjectId).map((value) => new Types.ObjectId(value));
+      const categorySlugs = categoryValues.filter((value) => !isValidObjectId(value));
+      if (categorySlugs.length > 0) {
+        const slugDocs = await CategoryModel.find({ slug: { $in: categorySlugs } }).select('_id').lean();
+        categoryIds.push(...slugDocs.map((doc: any) => doc._id));
       }
+      if (categoryIds.length === 0) return { products: [], total: 0, page, limit, totalPages: 0 };
+      filter.category = categoryIds.length === 1 ? categoryIds[0] : { $in: categoryIds };
     }
 
-    if (brand) {
-      if (isValidObjectId(brand)) {
-        filter.brand = new Types.ObjectId(brand);
-      } else {
-        const brandDoc: any = await BrandModel.findOne({ slug: brand }).lean();
-        if (brandDoc) filter.brand = brandDoc._id;
-        else return { products: [], total: 0, page, limit, totalPages: 0 };
+    const brandValues = splitFilterValues(brand);
+    if (brandValues.length > 0) {
+      const brandIds = brandValues.filter(isValidObjectId).map((value) => new Types.ObjectId(value));
+      const brandSlugs = brandValues.filter((value) => !isValidObjectId(value));
+      if (brandSlugs.length > 0) {
+        const slugDocs = await BrandModel.find({ slug: { $in: brandSlugs } }).select('_id').lean();
+        brandIds.push(...slugDocs.map((doc: any) => doc._id));
       }
+      if (brandIds.length === 0) return { products: [], total: 0, page, limit, totalPages: 0 };
+      filter.brand = brandIds.length === 1 ? brandIds[0] : { $in: brandIds };
     }
 
     if (dosageForm) filter.dosageForm = dosageForm;
     if (unitType) filter.unitType = unitType;
     if (typeof isFeatured === 'boolean') filter.isFeatured = isFeatured;
     if (typeof requiresPrescription === 'boolean') filter.requiresPrescription = requiresPrescription;
+    if (inStock === true) filter.stock = { $gt: 0 };
 
     if (minPrice !== undefined || maxPrice !== undefined) {
       filter.price = {};
@@ -297,7 +319,7 @@ export class ProductRepository {
     const [docs, total] = await Promise.all([
       ProductModel.find(filter)
         .select('-buyingPrice')
-        .sort(sort)
+        .sort(buildSort(sort))
         .skip(skip)
         .limit(limit)
         .populate('category', 'name slug')
@@ -367,6 +389,7 @@ export class ProductRepository {
       requiresPrescription,
       minPrice,
       maxPrice,
+      inStock,
       includeInactive = true,
     } = query;
 
@@ -376,30 +399,35 @@ export class ProductRepository {
       filter.isActive = true;
     }
 
-    if (category) {
-      if (isValidObjectId(category)) {
-        filter.category = new Types.ObjectId(category);
-      } else {
-        const catDoc: any = await CategoryModel.findOne({ slug: category }).lean();
-        if (catDoc) filter.category = catDoc._id;
-        else return { products: [], total: 0, page, limit, totalPages: 0, meta: { total: 0, page, limit, totalPages: 0 } };
+    const categoryValues = splitFilterValues(category);
+    if (categoryValues.length > 0) {
+      const categoryIds = categoryValues.filter(isValidObjectId).map((value) => new Types.ObjectId(value));
+      const categorySlugs = categoryValues.filter((value) => !isValidObjectId(value));
+      if (categorySlugs.length > 0) {
+        const slugDocs = await CategoryModel.find({ slug: { $in: categorySlugs } }).select('_id').lean();
+        categoryIds.push(...slugDocs.map((doc: any) => doc._id));
       }
+      if (categoryIds.length === 0) return { products: [], total: 0, page, limit, totalPages: 0, meta: { total: 0, page, limit, totalPages: 0 } };
+      filter.category = categoryIds.length === 1 ? categoryIds[0] : { $in: categoryIds };
     }
 
-    if (brand) {
-      if (isValidObjectId(brand)) {
-        filter.brand = new Types.ObjectId(brand);
-      } else {
-        const brandDoc: any = await BrandModel.findOne({ slug: brand }).lean();
-        if (brandDoc) filter.brand = brandDoc._id;
-        else return { products: [], total: 0, page, limit, totalPages: 0, meta: { total: 0, page, limit, totalPages: 0 } };
+    const brandValues = splitFilterValues(brand);
+    if (brandValues.length > 0) {
+      const brandIds = brandValues.filter(isValidObjectId).map((value) => new Types.ObjectId(value));
+      const brandSlugs = brandValues.filter((value) => !isValidObjectId(value));
+      if (brandSlugs.length > 0) {
+        const slugDocs = await BrandModel.find({ slug: { $in: brandSlugs } }).select('_id').lean();
+        brandIds.push(...slugDocs.map((doc: any) => doc._id));
       }
+      if (brandIds.length === 0) return { products: [], total: 0, page, limit, totalPages: 0, meta: { total: 0, page, limit, totalPages: 0 } };
+      filter.brand = brandIds.length === 1 ? brandIds[0] : { $in: brandIds };
     }
 
     if (dosageForm) filter.dosageForm = dosageForm;
     if (unitType) filter.unitType = unitType;
     if (typeof isFeatured === 'boolean') filter.isFeatured = isFeatured;
     if (typeof requiresPrescription === 'boolean') filter.requiresPrescription = requiresPrescription;
+    if (inStock === true) filter.stock = { $gt: 0 };
 
     if (minPrice !== undefined || maxPrice !== undefined) {
       filter.price = {};
@@ -419,7 +447,7 @@ export class ProductRepository {
     const [docs, total] = await Promise.all([
       ProductModel.find(filter)
         .select('+buyingPrice')
-        .sort(sort)
+        .sort(buildSort(sort))
         .skip(skip)
         .limit(limit)
         .populate('category', 'name slug')

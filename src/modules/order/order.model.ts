@@ -23,6 +23,7 @@ const orderItemSnapshotSchema = new Schema<IOrderItemSnapshot>(
       default: 'immediate',
     },
     totalPrice: { type: Number, required: true, min: 0 },
+    buyingPrice: { type: Number, min: 0, select: false },
     requiresPrescription: { type: Boolean, default: false },
   },
   { _id: false }

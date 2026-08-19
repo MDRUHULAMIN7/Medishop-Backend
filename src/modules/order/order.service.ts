@@ -180,12 +180,15 @@ export class OrderService {
       const effectiveUnitPrice = clientItem?.unitPrice !== undefined ? Number(clientItem.unitPrice) : cartItem.product.effectivePrice;
       const itemTotalPrice = clientItem?.totalPrice !== undefined ? Number(clientItem.totalPrice) : (effectiveUnitPrice * targetQty);
 
-      let product = await ProductModel.findById(targetProdId);
+      let product = await ProductModel.findById(targetProdId).select('+buyingPrice');
       if (!product) {
         throw new NotFoundError(`Product "${cartItem.product.name}" not found`);
       }
 
       const currentBaseStock = Math.max(0, Number(product.stockCached || product.stock || 0));
+      const unitTier = (Array.isArray(product.packaging) ? product.packaging : []).find((tier: any) => tier.unit === selectedUnit)
+        || (Array.isArray(product.unitPrices) ? product.unitPrices.find((tier: any) => tier.unit === selectedUnit) : null);
+      const buyingPrice = Number(unitTier?.buyingPrice ?? product.buyingPrice ?? 0);
       const maxFullBoxesInStock = Math.floor(currentBaseStock / unitMultiplier);
 
       // Never trust the client for inventory quantities. A stale cart (or a
@@ -243,6 +246,7 @@ export class OrderService {
         unitPrice: effectiveUnitPrice,
         discountPrice: product.discountPrice !== undefined ? Number(product.discountPrice) : undefined,
         effectiveUnitPrice,
+        buyingPrice,
         requiresPrescription: Boolean(product.requiresPrescription),
       };
 

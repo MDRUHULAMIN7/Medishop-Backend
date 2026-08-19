@@ -132,6 +132,7 @@ export const productQuerySchema = z.object({
   requiresPrescription: z.string().optional(),
   minPrice: z.string().optional(),
   maxPrice: z.string().optional(),
+  inStock: z.string().optional(),
   includeInactive: z.string().optional(),
 });
 

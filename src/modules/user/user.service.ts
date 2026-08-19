@@ -4,6 +4,7 @@ import { authRepository } from '../auth/auth.repository';
 import { UserModel } from './user.model';
 import { StaffInvitationModel } from './staffInvitation.model';
 import { createAccessToken, createRefreshToken, generateSessionId } from '../auth/auth.utils';
+import { emitToUser } from '../../socket';
 import {
   CreateAddressInput,
   CreateUserInput,
@@ -138,6 +139,9 @@ export class UserService {
     // If blocked, immediately revoke all refresh token sessions so user cannot refresh or continue session
     if (status === 'blocked') {
       await authRepository.revokeAllRefreshSessions(userId);
+      emitToUser(userId, 'account:blocked', {
+        message: 'Your account has been blocked by an administrator. Access is restricted.',
+      });
     }
 
     return userRepository.toPublicUser(updatedUser, false);

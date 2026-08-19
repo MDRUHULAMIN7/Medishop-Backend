@@ -329,6 +329,12 @@ export class InventoryService {
 
       const safeSupplier = supplier && Types.ObjectId.isValid(supplier) ? new Types.ObjectId(supplier) : null;
       const safeUserId = userId && Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
+      const buyingUnit = input.unit || product.unitType || product.baseUnit || 'pcs';
+      const unitTier = (Array.isArray(product.packaging) ? product.packaging : []).find((tier: any) => tier.unit === buyingUnit)
+        || (Array.isArray(product.unitPrices) ? product.unitPrices.find((tier: any) => tier.unit === buyingUnit) : null);
+      const unitMultiplier = Math.max(1, Number(unitTier?.baseUnitQty || unitTier?.multiplier || 1));
+      const unitBuyingPrice = Number(costPrice) || 0;
+      const baseUnitCost = unitBuyingPrice / unitMultiplier;
 
       const batch = await BatchModel.findOneAndUpdate(
         { product: productId, batchNumber: batchNumber.trim() },
@@ -336,9 +342,22 @@ export class InventoryService {
           $inc: { quantity: Number(quantity) },
           $set: {
             expiryDate: expDate,
-            costPrice: Number(costPrice) || 0,
+            costPrice: baseUnitCost,
+            buyingPriceUnit: buyingUnit,
+            buyingPrice: unitBuyingPrice,
             supplier: safeSupplier,
             isActive: true,
+          },
+          $push: {
+            buyingPriceHistory: {
+              unit: buyingUnit,
+              price: unitBuyingPrice,
+              baseUnitPrice: baseUnitCost,
+              receivedAt: new Date(),
+              quantity: Number(quantity),
+              batchNumber: batchNumber.trim(),
+              recordedBy: safeUserId,
+            },
           },
           $setOnInsert: {
             receivedDate: new Date(),
@@ -370,43 +389,34 @@ export class InventoryService {
         ledgerEntry = created;
       }
 
-      const costNum = Number(costPrice) || 0;
-      if (costNum > 0) {
-        const updatedPackaging = Array.isArray(product.packaging)
+      const updatedPackaging = Array.isArray(product.packaging)
           ? product.packaging.map((pkg: any) => ({
               ...pkg,
-              buyingPrice: costNum * (pkg.baseUnitQty || 1),
+              ...(pkg.unit === buyingUnit ? { buyingPrice: unitBuyingPrice } : {}),
             }))
           : [];
 
-        const updatedUnitPrices = Array.isArray(product.unitPrices)
+      const updatedUnitPrices = Array.isArray(product.unitPrices)
           ? product.unitPrices.map((up: any) => ({
               ...up,
-              buyingPrice: costNum * (up.multiplier || 1),
+              ...(up.unit === buyingUnit ? { buyingPrice: unitBuyingPrice } : {}),
             }))
           : [];
 
-        await ProductModel.findByIdAndUpdate(
-          productId,
-          {
-            $inc: { stockCached: Number(quantity), stock: Number(quantity) },
-            $set: {
-              buyingPrice: costNum,
-              ...(updatedPackaging.length > 0 ? { packaging: updatedPackaging } : {}),
-              ...(updatedUnitPrices.length > 0 ? { unitPrices: updatedUnitPrices } : {}),
-            },
+      await ProductModel.findByIdAndUpdate(
+        productId,
+        {
+          $inc: { stockCached: Number(quantity), stock: Number(quantity) },
+          $set: {
+            buyingPrice: product.unitType === buyingUnit || product.baseUnit === buyingUnit
+              ? unitBuyingPrice
+              : Number(product.buyingPrice || 0),
+            ...(updatedPackaging.length > 0 ? { packaging: updatedPackaging } : {}),
+            ...(updatedUnitPrices.length > 0 ? { unitPrices: updatedUnitPrices } : {}),
           },
-          sessionOpts
-        );
-      } else {
-        await ProductModel.findByIdAndUpdate(
-          productId,
-          {
-            $inc: { stockCached: Number(quantity), stock: Number(quantity) },
-          },
-          sessionOpts
-        );
-      }
+        },
+        sessionOpts
+      );
 
       if (useTransaction && session && !passedSession) {
         await session.commitTransaction();
@@ -514,6 +524,7 @@ export class InventoryService {
       expiryDate?: string;
       quantity?: number;
       costPrice?: number;
+      unit?: string;
       isActive?: boolean;
     },
     userId?: string
@@ -538,7 +549,26 @@ export class InventoryService {
       }
     }
     if (updateData.costPrice !== undefined) {
-      updateSet.costPrice = Math.max(0, Number(updateData.costPrice));
+      const product = await ProductModel.findById(existingBatch.product).select('+buyingPrice');
+      const buyingUnit = updateData.unit || existingBatch.buyingPriceUnit || product?.unitType || product?.baseUnit || 'pcs';
+      const tier = (Array.isArray(product?.packaging) ? product.packaging : []).find((item: any) => item.unit === buyingUnit)
+        || (Array.isArray(product?.unitPrices) ? product.unitPrices.find((item: any) => item.unit === buyingUnit) : null);
+      const multiplier = Math.max(1, Number(tier?.baseUnitQty || tier?.multiplier || 1));
+      const unitPrice = Math.max(0, Number(updateData.costPrice));
+      updateSet.costPrice = unitPrice / multiplier;
+      updateSet.buyingPrice = unitPrice;
+      updateSet.buyingPriceUnit = buyingUnit;
+      updateSet.$push = {
+        buyingPriceHistory: {
+          unit: buyingUnit,
+          price: unitPrice,
+          baseUnitPrice: unitPrice / multiplier,
+          receivedAt: new Date(),
+          quantity: existingBatch.quantity,
+          batchNumber: existingBatch.batchNumber,
+          recordedBy: userId && Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null,
+        },
+      };
     }
     if (updateData.isActive !== undefined) {
       updateSet.isActive = Boolean(updateData.isActive);
@@ -554,9 +584,23 @@ export class InventoryService {
 
     const updatedBatch = await BatchModel.findByIdAndUpdate(
       batchId,
-      { $set: updateSet },
+      { $set: Object.fromEntries(Object.entries(updateSet).filter(([key]) => key !== '$push')), ...(updateSet.$push ? { $push: { buyingPriceHistory: updateSet.$push.buyingPriceHistory } } : {}) },
       { new: true }
     );
+
+    if (updateData.costPrice !== undefined) {
+      const product = await ProductModel.findById(existingBatch.product).select('+buyingPrice');
+      const unit = updateData.unit || existingBatch.buyingPriceUnit || product?.unitType || product?.baseUnit || 'pcs';
+      const packaging = Array.isArray(product?.packaging) ? product.packaging : [];
+      const unitPrices = Array.isArray(product?.unitPrices) ? product.unitPrices : [];
+      await ProductModel.findByIdAndUpdate(existingBatch.product, {
+        $set: {
+          packaging: packaging.map((tier: any) => tier.unit === unit ? { ...tier, buyingPrice: Number(updateData.costPrice) } : tier),
+          unitPrices: unitPrices.map((tier: any) => tier.unit === unit ? { ...tier, buyingPrice: Number(updateData.costPrice) } : tier),
+          ...(unit === product?.unitType || unit === product?.baseUnit ? { buyingPrice: Number(updateData.costPrice) } : {}),
+        },
+      });
+    }
 
     if (qtyDelta !== 0) {
       const safeUserId = userId && Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;

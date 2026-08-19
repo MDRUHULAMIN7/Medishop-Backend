@@ -8,6 +8,7 @@ import {
   getInventoryList,
   getMyCustomerPurchases,
   getPosSaleByInvoice,
+  downloadPosSaleInvoice,
   getPosSales,
   getStockLedger,
   getStores,
@@ -29,6 +30,7 @@ router.use(authenticate);
 
 // 1. Customer Endpoint: Fetch logged in customer's in-store / POS purchases
 router.get('/my-purchases', getMyCustomerPurchases);
+router.get('/sales/invoice/:invoiceNumber/download', validateRequest({ params: invoiceNumberParamsSchema }), downloadPosSaleInvoice);
 
 // 2. Staff / Admin protected endpoints
 router.use(authorize('admin', 'super_admin', 'pharmacist', 'sales_staff', 'inventory_manager'));

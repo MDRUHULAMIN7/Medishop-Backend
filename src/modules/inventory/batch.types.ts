@@ -7,11 +7,24 @@ export interface IBatch {
   expiryDate: Date;
   quantity: number; // current remaining quantity in baseUnit
   costPrice: number; // cost per baseUnit
+  buyingPriceUnit?: string;
+  buyingPrice?: number;
+  buyingPriceHistory?: BatchBuyingPriceHistory[];
   supplier?: Types.ObjectId | string;
   receivedDate: Date;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+export interface BatchBuyingPriceHistory {
+  unit: string;
+  price: number;
+  baseUnitPrice: number;
+  receivedAt: Date;
+  quantity: number;
+  batchNumber: string;
+  recordedBy?: Types.ObjectId | string;
 }
 
 export interface ReceiveBatchInput {
@@ -20,6 +33,7 @@ export interface ReceiveBatchInput {
   expiryDate: string | Date;
   quantity: number; // in baseUnit
   costPrice: number; // per baseUnit
+  unit?: string;
   supplier?: string;
   purchaseReferenceId?: string;
 }
