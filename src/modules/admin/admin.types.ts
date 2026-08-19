@@ -6,6 +6,10 @@ export interface SalesSummaryResponse {
   combinedRevenue: number;
   todayRevenue: number;
   todayOrdersCount: number;
+  totalCost: number;
+  grossProfit: number;
+  grossLoss: number;
+  marginPercent: number;
 }
 
 export interface OrderStatusBreakdownResponse {

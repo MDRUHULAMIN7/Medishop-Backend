@@ -15,7 +15,7 @@ export class AdminRepository {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const [onlineSalesStats, posSalesStats, todayStats] = await Promise.all([
+    const [onlineSalesStats, posSalesStats, onlineCostStats, posCostStats, todayStats] = await Promise.all([
       OrderModel.aggregate([
         { $match: { orderStatus: { $ne: 'cancelled' } } },
         {
@@ -35,6 +35,16 @@ export class AdminRepository {
             totalPosSales: { $sum: 1 },
           },
         },
+      ]),
+      OrderModel.aggregate([
+        { $match: { orderStatus: { $ne: 'cancelled' } } },
+        { $unwind: '$items' },
+        { $group: { _id: null, totalCost: { $sum: { $multiply: [{ $ifNull: ['$items.buyingPrice', 0] }, '$items.quantity'] } } } },
+      ]),
+      PosSaleModel.aggregate([
+        { $match: { status: 'completed' } },
+        { $unwind: '$items' },
+        { $group: { _id: null, totalCost: { $sum: { $multiply: [{ $ifNull: ['$items.buyingPrice', 0] }, '$items.quantity'] } } } },
       ]),
       OrderModel.aggregate([
         {
@@ -62,14 +72,22 @@ export class AdminRepository {
     const todayRevenue = todayStats.length > 0 ? todayStats[0].todayRevenue : 0;
     const todayOrdersCount = todayStats.length > 0 ? todayStats[0].todayOrdersCount : 0;
 
+    const totalCost = Number(((onlineCostStats.length ? onlineCostStats[0].totalCost : 0) + (posCostStats.length ? posCostStats[0].totalCost : 0)));
+    const combinedRevenue = Number(totalRevenue + totalPosRevenue);
+    const grossProfit = Math.max(0, combinedRevenue - totalCost);
+    const grossLoss = Math.max(0, totalCost - combinedRevenue);
     return {
       totalRevenue: Number(totalRevenue.toFixed(2)),
       totalOrders,
       totalPosSales,
       totalPosRevenue: Number(totalPosRevenue.toFixed(2)),
-      combinedRevenue: Number((totalRevenue + totalPosRevenue).toFixed(2)),
+      combinedRevenue: Number(combinedRevenue.toFixed(2)),
       todayRevenue: Number(todayRevenue.toFixed(2)),
       todayOrdersCount,
+      totalCost: Number(totalCost.toFixed(2)),
+      grossProfit: Number(grossProfit.toFixed(2)),
+      grossLoss: Number(grossLoss.toFixed(2)),
+      marginPercent: combinedRevenue > 0 ? Number(((grossProfit / combinedRevenue) * 100).toFixed(2)) : 0,
     };
   }
 

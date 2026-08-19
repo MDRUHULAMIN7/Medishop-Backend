@@ -190,6 +190,7 @@ export interface ProductFilterQuery {
   requiresPrescription?: boolean;
   minPrice?: number;
   maxPrice?: number;
+  inStock?: boolean;
   includeInactive?: boolean;
 }
 

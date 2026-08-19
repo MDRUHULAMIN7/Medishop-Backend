@@ -57,6 +57,7 @@ export interface IOrderItemSnapshot {
   preOrderQuantity?: number;
   fulfillmentType?: 'immediate' | 'preorder' | 'mixed';
   totalPrice: number;
+  buyingPrice?: number;
   requiresPrescription: boolean;
 }
 

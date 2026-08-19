@@ -75,9 +75,11 @@ const posSaleItemSchema = new Schema<IPosSaleItem>(
   {
     product: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
     name: { type: String, required: true },
+    unit: { type: String, trim: true },
     unitPrice: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 1 },
     totalPrice: { type: Number, required: true, min: 0 },
+    buyingPrice: { type: Number, min: 0, select: false },
     batchNumber: { type: String },
   },
   { _id: false }

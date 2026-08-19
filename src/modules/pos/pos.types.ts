@@ -52,9 +52,11 @@ export interface IStockLedger {
 export interface IPosSaleItem {
   product: Types.ObjectId;
   name: string;
+  unit?: string;
   unitPrice: number;
   quantity: number;
   totalPrice: number;
+  buyingPrice?: number;
   batchNumber?: string;
 }
 
@@ -109,6 +111,7 @@ export interface PosCheckoutInput {
   items: Array<{
     productId: string;
     quantity: number;
+    unit?: string;
     unitPrice?: number;
     batchNumber?: string;
   }>;

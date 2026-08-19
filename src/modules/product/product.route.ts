@@ -8,6 +8,8 @@ import {
   createProduct,
   deleteProduct,
   getFeaturedProducts,
+  getAdminProductByIdOrSlug,
+  getAdminProducts,
   getProductByIdOrSlug,
   getProducts,
   getSearchSuggestions,
@@ -89,6 +91,8 @@ router.use('/:productId/reviews', reviewRouter);
  */
 router.get('/', validateRequest({ query: productQuerySchema }), getProducts);
 
+router.get('/admin', authenticate, authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist', 'sales_staff'), validateRequest({ query: productQuerySchema }), getAdminProducts);
+
 /**
  * @openapi
  * /products/search/suggestions:
@@ -153,6 +157,8 @@ router.get('/featured', getFeaturedProducts);
  *         description: Product not found
  */
 router.get('/:idOrSlug', validateRequest({ params: productIdOrSlugSchema }), getProductByIdOrSlug);
+
+router.get('/admin/:idOrSlug', authenticate, authorize('admin', 'super_admin', 'inventory_manager', 'pharmacist', 'sales_staff'), validateRequest({ params: productIdOrSlugSchema }), getAdminProductByIdOrSlug);
 
 /**
  * @openapi

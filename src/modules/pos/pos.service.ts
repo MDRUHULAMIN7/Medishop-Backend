@@ -99,7 +99,7 @@ export class PosService {
 
     // Atomic Stock Validation & Deduction per item
     for (const item of input.items) {
-      const product = await ProductModel.findById(item.productId);
+      const product = await ProductModel.findById(item.productId).select('+buyingPrice');
       if (!product || !product.isActive) {
         throw new NotFoundError(`Product "${item.productId}" not found or inactive`, 'PRODUCT_NOT_FOUND');
       }
@@ -111,15 +111,24 @@ export class PosService {
       }
 
       const unitPrice = item.unitPrice !== undefined ? Number(item.unitPrice) : Number(product.price);
+      const unitTier = (Array.isArray(product.packaging) ? product.packaging : []).find((tier: any) => tier.unit === (item as any).unit)
+        || (Array.isArray(product.unitPrices) ? product.unitPrices.find((tier: any) => tier.unit === (item as any).unit) : null);
+      const unitMultiplier = Math.max(1, Number(unitTier?.baseUnitQty || unitTier?.multiplier || 1));
+      const parsedMultiplier = Number(String((item as any).unit || '').match(/\((\d+)\s*pcs\)/i)?.[1] || 1);
+      const resolvedMultiplier = unitTier ? unitMultiplier : parsedMultiplier;
+      const buyingPrice = Number(unitTier?.buyingPrice ?? product.buyingPrice ?? 0) / resolvedMultiplier;
+      const displayUnitPrice = Number(unitTier?.price ?? unitPrice * resolvedMultiplier);
       const itemTotalPrice = unitPrice * item.quantity;
       subtotal += itemTotalPrice;
 
       saleItemSnapshots.push({
         product: product._id,
         name: product.name,
-        unitPrice,
+        unit: item.unit || product.unitType,
+        unitPrice: displayUnitPrice,
         quantity: item.quantity,
         totalPrice: itemTotalPrice,
+        buyingPrice,
         batchNumber: item.batchNumber || product.batchNumber,
       });
     }

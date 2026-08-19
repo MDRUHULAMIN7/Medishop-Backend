@@ -4,6 +4,9 @@ import { ApiResponse } from '../../utils/ApiResponse';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { UserModel } from '../user/user.model';
 import { posService } from './pos.service';
+import { generateInvoice } from '../../utils/invoiceGenerator';
+import { settingsService } from '../settings/settings.service';
+import { AppError } from '../../utils/AppError';
 
 // Store Handlers
 export const getStores = asyncHandler(async (_req: Request, res: Response) => {
@@ -47,6 +50,48 @@ export const getPosSales = asyncHandler(async (_req: Request, res: Response) => 
 export const getPosSaleByInvoice = asyncHandler(async (req: Request, res: Response) => {
   const sale = await posService.getPosSaleByInvoice(req.params.invoiceNumber);
   return ApiResponse.success(res, 'Invoice details fetched successfully', sale);
+});
+
+export const downloadPosSaleInvoice = asyncHandler(async (req: Request, res: Response) => {
+  const sale: any = await posService.getPosSaleByInvoice(req.params.invoiceNumber);
+  const staffRoles = ['admin', 'super_admin', 'pharmacist', 'sales_staff', 'inventory_manager'];
+  if (!staffRoles.includes(req.user?.role || '')) {
+    const customerId = sale.customerUser?._id?.toString?.() || sale.customerUser?.toString?.();
+    if (customerId !== req.user?.id) {
+      throw new AppError('You are not allowed to access this receipt.', HTTP_STATUS.FORBIDDEN, 'RECEIPT_ACCESS_DENIED');
+    }
+  }
+  const siteSettings = await settingsService.getPublicSettings().catch(() => null);
+  const pdfBuffer = await generateInvoice({
+    id: sale.invoiceNumber,
+    invoiceNumber: sale.invoiceNumber,
+    orderNumber: sale.invoiceNumber,
+    createdAt: sale.createdAt,
+    customerName: sale.customerName,
+    customerPhone: sale.customerPhone,
+    customerEmail: sale.customerEmail,
+    customerAddress: sale.customerAddress,
+    shippingAddress: {
+      fullName: sale.customerName || 'Walk-in Customer',
+      recipientName: sale.customerName || 'Walk-in Customer',
+      phone: sale.customerPhone || 'N/A',
+      email: sale.customerEmail,
+      addressLine: sale.customerAddress || '',
+      district: '',
+    },
+    user: { name: sale.customerName, phone: sale.customerPhone, email: sale.customerEmail },
+    paymentMethod: sale.paymentMethod,
+    paymentStatus: sale.status === 'completed' ? 'paid' : 'failed',
+    orderStatus: sale.status,
+    items: sale.items.map((item: any) => ({ name: item.name || item.productName, unitPrice: item.unitPrice, quantity: item.quantity, totalPrice: item.totalPrice })),
+    subtotal: sale.subtotal,
+    discountTotal: sale.discountTotal ?? sale.discountAmount,
+    grandTotal: sale.grandTotal,
+    summary: { subtotal: sale.subtotal, couponDiscount: sale.discountTotal ?? sale.discountAmount ?? 0, deliveryCharge: 0, grandTotal: sale.grandTotal },
+  }, siteSettings);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=receipt-${sale.invoiceNumber}.pdf`);
+  return res.status(200).send(pdfBuffer);
 });
 
 export const voidPosSale = asyncHandler(async (req: Request, res: Response) => {
