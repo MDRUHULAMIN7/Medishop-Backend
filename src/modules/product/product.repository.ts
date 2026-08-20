@@ -308,10 +308,7 @@ export class ProductRepository {
     }
 
     if (search && search.trim()) {
-      filter.$or = [
-        { name: { $regex: search.trim(), $options: 'i' } },
-        { genericName: { $regex: search.trim(), $options: 'i' } },
-      ];
+      filter.$text = { $search: search.trim() };
     }
 
     const skip = (page - 1) * limit;
@@ -356,10 +353,12 @@ export class ProductRepository {
   }
 
   async findSuggestions(queryText: string, limit = 8): Promise<SearchSuggestionItem[]> {
-    const regex = new RegExp(queryText.trim(), 'i');
+    const escapedQuery = queryText.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!escapedQuery) return [];
+    const regex = new RegExp(`^${escapedQuery}`, 'i');
     const docs = await ProductModel.find({
       isActive: true,
-      $or: [{ name: regex }, { genericName: regex }],
+      $or: [{ name: regex }, { genericName: regex }, { tags: regex }],
     })
       .select('name slug genericName dosageForm strength')
       .limit(limit)
@@ -436,10 +435,7 @@ export class ProductRepository {
     }
 
     if (search && search.trim()) {
-      filter.$or = [
-        { name: { $regex: search.trim(), $options: 'i' } },
-        { genericName: { $regex: search.trim(), $options: 'i' } },
-      ];
+      filter.$text = { $search: search.trim() };
     }
 
     const skip = (page - 1) * limit;

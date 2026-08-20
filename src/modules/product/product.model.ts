@@ -116,6 +116,10 @@ productSchema.index({ brand: 1, isActive: 1 });
 productSchema.index({ isFeatured: 1, isActive: 1 });
 productSchema.index({ dosageForm: 1, isActive: 1 });
 productSchema.index({ price: 1, isActive: 1 });
+productSchema.index({ isActive: 1, name: 1 });
+productSchema.index({ isActive: 1, genericName: 1 });
+productSchema.index({ isActive: 1, stock: 1 });
+productSchema.index({ isActive: 1, createdAt: -1 });
 
 // Full-Text Search Index across name, genericName, tags, and description with field weighting
 productSchema.index(

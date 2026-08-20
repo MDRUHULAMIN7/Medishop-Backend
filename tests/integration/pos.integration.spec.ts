@@ -35,4 +35,14 @@ describe('Shared Inventory & POS Integration Endpoints', () => {
     });
     expect(res.status).toBe(401);
   });
+
+  it('GET /api/v1/admin/reports/analytics should be registered and require auth', async () => {
+    const res = await request(app).get('/api/v1/admin/reports/analytics?channel=pos&includeRows=true');
+    expect(res.status).toBe(401);
+  });
+
+  it('GET /api/v1/admin/products/:id/insights should be registered and require auth', async () => {
+    const res = await request(app).get('/api/v1/admin/products/507f1f77bcf86cd799439011/insights');
+    expect(res.status).toBe(401);
+  });
 });

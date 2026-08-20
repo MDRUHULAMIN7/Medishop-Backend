@@ -4,17 +4,25 @@ import { authorize } from '../../middlewares/authorize';
 import { validateRequest } from '../../middlewares/validateRequest';
 import {
   getDashboardSummary,
+  getAnalytics,
   getLowStockReport,
   getOrderStatusBreakdown,
+  getProductInsights,
   getSalesSummary,
 } from './admin.controller';
-import { lowStockQuerySchema } from './admin.validation';
+import { adminAnalyticsQuerySchema, lowStockQuerySchema, productInsightsParamsSchema } from './admin.validation';
 
 const router = Router();
 
 // All Admin Dashboard endpoints require Admin authentication
 router.use(authenticate);
-router.use(authorize('admin', 'pharmacist'));
+
+// Reporting is read-only and is also used by the sales workspace.
+router.get('/reports/analytics', authorize('pharmacist', 'sales_staff', 'inventory_manager'), validateRequest({ query: adminAnalyticsQuerySchema }), getAnalytics);
+router.get('/reports/export-data', authorize('pharmacist', 'sales_staff', 'inventory_manager'), validateRequest({ query: adminAnalyticsQuerySchema }), getAnalytics);
+router.get('/products/:productId/insights', authorize('pharmacist', 'sales_staff', 'inventory_manager'), validateRequest({ params: productInsightsParamsSchema }), getProductInsights);
+
+router.use(authorize('pharmacist'));
 
 /**
  * @openapi
