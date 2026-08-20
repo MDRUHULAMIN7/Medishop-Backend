@@ -3,6 +3,21 @@ import { describe, expect, it } from 'vitest';
 import app from '../../src/app';
 
 describe('Shared Inventory & POS Integration Endpoints', () => {
+  it('GET /api/v1/products/admin should be registered and require auth', async () => {
+    const res = await request(app).get('/api/v1/products/admin?page=1&limit=10');
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /api/v1/pos/scanner/session should be registered and require auth', async () => {
+    const res = await request(app).post('/api/v1/pos/scanner/session').send({});
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /api/v1/pos/recognition should be registered and require auth', async () => {
+    const res = await request(app).post('/api/v1/pos/recognition');
+    expect(res.status).toBe(401);
+  });
+
   it('GET /api/v1/stores should return 401 Unauthorized without auth token', async () => {
     const res = await request(app).get('/api/v1/stores');
     expect(res.status).toBe(401);
